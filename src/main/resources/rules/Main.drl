@@ -1,0 +1,56 @@
+package com.sample
+import com.sample.Game;
+import com.sample.Players.PlayerInGame;
+import com.sample.Cards.Card;
+
+import java.util.ArrayList;
+
+rule "Game READY, create pile, select dealer"
+    when
+		$g : Game(
+			status == Game.GAME_STATUS.READY,
+			playersInGame.size() >= 2 && playersInGame.size() <= Game.MAX_PLAYERS
+		)
+    then
+    	$g.createPile();
+    	$g.setPlayerRoles();
+    	$g.setStatus(Game.GAME_STATUS.BEGIN);
+    	update($g);
+end
+
+rule "Game BEGIN, the dealer deals 7 cards to each player"
+no-loop
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.BEGIN,
+			$players : playersInGame
+		)
+		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
+	then
+		$g.dealCardsToPlayers($dealer, Game.CARDS_TO_DEAL);
+		update($g);
+end
+
+rule "Game BEGIN, the dealer draws one card from the pile and plays if possible"
+	when 
+		$g : Game(
+			status == Game.GAME_STATUS.BEGIN,
+			$players : playersInGame
+		)
+		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
+	then
+		ArrayList<Card> cards = $g.dealCardsToPlayer($dealer, 1);
+		$g.playCards($dealer, cards);
+end
+
+rule "PLAYING CARDS not empty, resolve cards effects"
+	when 
+		$g : Game(
+			status == Game.GAME_STATUS.BEGIN || status == Game.GAME_STATUS.PLAY,
+			$playingCards : playingCards
+		)
+		eval($playingCards.size() == 1)
+	then
+		
+end
+
