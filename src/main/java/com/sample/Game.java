@@ -17,10 +17,13 @@ public class Game {
 	public static final int CARDS_TO_DEAL = 7;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, DRAW, RESPOND, SOLVE_EFFECTS, PLAY_CARDS, PASS_TURN};
+	
 	public static enum GAME_DIRECTION {LEFT, RIGHT}
 	
 	private String id;
 	private GAME_STATUS status = GAME_STATUS.INIT;
+	private PHASE_STATUS phaseStatus = null;
 	private GAME_DIRECTION direction = GAME_DIRECTION.LEFT;
 	
 	private ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
@@ -142,7 +145,6 @@ public class Game {
 			if(pile.size() > 0) {
 				Card card = pile.remove(pile.size() - 1);
 				cards.add(card);
-				p.setCards(cards);
 			}
 			else {
 				assert(discardPile.size() >= number - k);
@@ -151,15 +153,25 @@ public class Game {
 				k--;
 			}
 		}
+		
+		p.addCards(cards);
+		
 		return cards;
 	}
 	
 	public void playCards(PlayerInGame p, ArrayList<Card> cards) {
 		
-		for(Card card : cards)
+		for(Card card : cards) {
 			p.getCards().remove(card);
-		
+			discardPile.add(card);
+		}
 		setPlayingCards(new PlayerCards(p, cards));
+	}
+	
+	public void putAndShuffle(Card card) {
+		discardPile.remove(card);
+		pile.add(card);
+		shufflePile();
 	}
 	
 	/* SETTER/GETTER */
@@ -175,6 +187,14 @@ public class Game {
 	public void setStatus(GAME_STATUS status) {
 		this.status = status;
 	}
+	
+	public PHASE_STATUS getPhaseStatus() {
+		return phaseStatus;
+	}
+
+	public void setPhaseStatus(PHASE_STATUS phaseStatus) {
+		this.phaseStatus = phaseStatus;
+	}	
 
 	public ArrayList<PlayerInGame> getPlayersInGame() {
 		return playersInGame;
@@ -217,6 +237,14 @@ public class Game {
 		this.playingCards = playingCards;
 	}
 	
+	public Card getPlayingCard() {
+		return playingCard;
+	}
+
+	public void setPlayingCard(Card playingCard) {
+		this.playingCard = playingCard;
+	}
+	
 	/*ELEMENTI PER DROOLS*/
 
 	@Override
@@ -252,5 +280,4 @@ public class Game {
 			return false;
 		return true;
 	}
-	
 }

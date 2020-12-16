@@ -4,10 +4,14 @@ public class ActionCard extends Card {
 	
 	public static enum ACTION_TYPE {REVERSE, SKIP, DRAW_TWO, WILD, WILD_DRAW_FOUR};
 	
-	private final ACTION_TYPE type; 
+	private final ACTION_TYPE actionType; 
 	
-	public ActionCard(ACTION_TYPE type) {
+	public ActionCard(ACTION_TYPE actionType) {
 		super(Card.CARD_TYPE.ACTION);
-		this.type = type;
+		this.actionType = actionType;
+	}
+
+	public ACTION_TYPE getActionType() {
+		return actionType;
 	}
 }

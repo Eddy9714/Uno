@@ -2,6 +2,7 @@ package com.sample
 import com.sample.Game;
 import com.sample.Players.PlayerInGame;
 import com.sample.Cards.Card;
+import com.sample.Cards.ActionCard;
 
 import java.util.ArrayList;
 
@@ -15,42 +16,84 @@ rule "Game READY, create pile, select dealer"
     	$g.createPile();
     	$g.setPlayerRoles();
     	$g.setStatus(Game.GAME_STATUS.BEGIN);
+    	$g.setPhaseStatus(Game.PHASE_STATUS.DEAL_CARDS);
     	update($g);
 end
 
-rule "Game BEGIN, the dealer deals 7 cards to each player"
-no-loop
+rule "Game BEGIN, the dealer deals 7 cards to each player."
 	when
 		$g : Game(
 			status == Game.GAME_STATUS.BEGIN,
+			phaseStatus == Game.PHASE_STATUS.DEAL_CARDS,
 			$players : playersInGame
 		)
 		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
 	then
 		$g.dealCardsToPlayers($dealer, Game.CARDS_TO_DEAL);
+		$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);
 		update($g);
 end
 
-rule "Game BEGIN, the dealer draws one card from the pile and plays if possible"
-	when 
+rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
+	when
 		$g : Game(
 			status == Game.GAME_STATUS.BEGIN,
+			phaseStatus == Game.PHASE_STATUS.FIRST_CARD,
 			$players : playersInGame
 		)
 		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
 	then
 		ArrayList<Card> cards = $g.dealCardsToPlayer($dealer, 1);
 		$g.playCards($dealer, cards);
+		$g.setPhaseStatus(Game.PHASE_STATUS.SOLVE_EFFECTS);
+		update($g);
 end
 
-rule "PLAYING CARDS not empty, resolve cards effects"
+
+rule "PLAYING CARDS not empty, resolve cards effects if possible"
 	when 
 		$g : Game(
-			status == Game.GAME_STATUS.BEGIN || status == Game.GAME_STATUS.PLAY,
-			$playingCards : playingCards
+			status == Game.GAME_STATUS.BEGIN,
+			phaseStatus == Game.PHASE_STATUS.SOLVE_EFFECTS,
+			$playingCards : playingCards,
+			$players : playersInGame
 		)
-		eval($playingCards.size() == 1)
+		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
 	then
-		
+		if($playingCards != null && $playingCards.getCards().size() == 1){
+			Card playingCard = $playingCards.getCards().remove(0);
+			$g.setPlayingCard(playingCard);
+			$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_FIRST_CARD);
+		}
+		else {			
+			$g.setStatus(Game.GAME_STATUS.PLAY);
+			$g.setPhaseStatus(Game.PHASE_STATUS.PASS_TURN);
+		}
+		update($g);
 end
+
+rule "BEGIN, CHECK IF PLAYIED CARD IS NOT WILD_DRAW_FOUR. IF TRUE GO TO PLAY STATUS AND SOLVE EFFECTS OF CARD ELSE REPEAT DRAWING."
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.BEGIN,
+			phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$playingCard : playingCard
+		)
+	then
+		if($playingCard != null){
+			if($playingCard.type == Card.CARD_TYPE.ACTION && ((ActionCard) $playingCard).getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
+				$g.putAndShuffle($playingCard);
+				$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);
+			}
+			else {
+				$g.setStatus(Game.GAME_STATUS.PLAY);
+				$g.setPhaseStatus(Game.PHASE_STATUS.SOLVE_EFFECTS);
+			}
+		}
+		update($g);
+end
+
+
+
+
 

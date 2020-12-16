@@ -24,6 +24,7 @@ public class PlayerInGame{
 	public void setCards(ArrayList<Card> cards) {
 		this.cards = cards;
 	}
+	
 
 	public Player getPlayer() {
 		return player;
@@ -43,5 +44,14 @@ public class PlayerInGame{
 
 	public void setPlayerTurn(boolean playerTurn) {
 		this.playerTurn = playerTurn;
+	}
+	
+	public void addCard(Card card) {
+		this.cards.add(card);
+	}
+	
+	public void addCards(ArrayList<Card> cards) {
+		for(Card card : cards)
+			addCard(card);
 	}
 }
