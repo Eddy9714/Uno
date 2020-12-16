@@ -11,7 +11,7 @@ public class PlayerInGame{
 	private Player player;
 	private ROLE role;
 	private ArrayList<Card> cards = new ArrayList<Card>();
-	private boolean playerTurn = false;
+	private boolean playerTurn = false;//decide il turno semaforo
 	
 	public PlayerInGame(Player p) {
 		this.player = p;

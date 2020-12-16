@@ -27,10 +27,10 @@ public class Game {
 	private GAME_DIRECTION direction = GAME_DIRECTION.LEFT;
 	
 	private ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
-	private ArrayList<Card> pile = new ArrayList<Card>();
-	private ArrayList<Card> discardPile = new ArrayList<Card>();
-	private PlayerCards playingCards;
-	private Card playingCard;
+	private ArrayList<Card> pile = new ArrayList<Card>();//mazzo
+	private ArrayList<Card> discardPile = new ArrayList<Card>();//scarti
+	private PlayerCards playingCards;//pila di eventi che devono accadere
+	private Card playingCard;//ultima carta giocata
 	
 	/*COSTRUTTORI*/
 	
