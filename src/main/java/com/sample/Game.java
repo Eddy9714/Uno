@@ -32,7 +32,6 @@ public class Game {
 	private PlayerCards playingCards;//pila di eventi che devono accadere
 	private Card playingCard;//ultima carta giocata
 	
-	/*TESTIAMO GITHUB*/
 	
 	/*COSTRUTTORI*/
 	
@@ -99,9 +98,9 @@ public class Game {
 			
 			//Carte speciali
 			for(int i=0;i<colors.length; i++) {
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP));
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE));
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i]));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, colors[i]));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i]));
 			}
 		}
 		
@@ -150,8 +149,10 @@ public class Game {
 			}
 			else {
 				assert(discardPile.size() >= number - k);
+				Card card = discardPile.get(discardPile.size() - 1);
 				exchangePiles();
 				shufflePile();
+				discardPile.add(card);
 				k--;
 			}
 		}

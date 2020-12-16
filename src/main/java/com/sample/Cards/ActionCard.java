@@ -6,8 +6,13 @@ public class ActionCard extends Card {
 	
 	private final ACTION_TYPE actionType; 
 	
+	public ActionCard(ACTION_TYPE actionType, COLOR color) {
+		super(Card.CARD_TYPE.ACTION, color);
+		this.actionType = actionType;
+	}
+	
 	public ActionCard(ACTION_TYPE actionType) {
-		super(Card.CARD_TYPE.ACTION);
+		super(Card.CARD_TYPE.ACTION, null);
 		this.actionType = actionType;
 	}
 
