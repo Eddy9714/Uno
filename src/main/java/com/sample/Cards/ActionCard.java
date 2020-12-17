@@ -26,4 +26,9 @@ public class ActionCard extends Card {
 	public boolean isQuick() {
 		return quick;
 	}
+
+	@Override
+	public String toString() {
+		return "[" + actionType + (color != null ? " " + color : "") + "]";
+	}
 }

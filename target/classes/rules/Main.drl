@@ -1,20 +1,57 @@
 package com.sample
 import com.sample.Game;
+import java.util.ArrayList;
 import com.sample.Players.PlayerInGame;
+import com.sample.Utils.PlayerCards;
 import com.sample.Cards.Card;
 import com.sample.Cards.ActionCard;
+import java.util.Random;
+import java.util.Scanner;
 
 import java.util.ArrayList;
+
+rule "GAME INIT"
+	when 
+		$g : Game(
+			status == Game.GAME_STATUS.INIT
+		)
+	then
+		System.out.println("La partita è stata creata con successo");
+		System.out.println("Sto attendendo che ci siano almeno due giocatori...");
+		$g.setStatus(Game.GAME_STATUS.READY);
+		update($g);
+end
 
 rule "Game READY, create pile, select dealer"
     when
 		$g : Game(
 			status == Game.GAME_STATUS.READY,
-			playersInGame.size() >= 2 && playersInGame.size() <= Game.MAX_PLAYERS
+			$players : playersInGame,
+			$players.size() >= 2 && $players.size() <= Game.MAX_PLAYERS
 		)
     then
+    
+    	ArrayList<PlayerInGame> players = ((ArrayList<PlayerInGame>)$players);
+    	
+    	System.out.println("Giocatori trovati: " + players.size());
+    	System.out.println("Creo il mazzo");
     	$g.createPile();
-    	$g.setPlayerRoles();
+    	
+    	System.out.println("Imposto il dealer");
+    	Random rand = new Random();
+		int randomPlayerIndex = rand.nextInt(players.size());
+		
+		for(int k=0;k<$players.size(); k++) {
+			if(randomPlayerIndex == k) {
+				PlayerInGame dealer = players.get(k);
+				dealer.setRole(PlayerInGame.ROLE.DEALER);
+				dealer.setPlayerTurn(true);
+			}
+			else 
+				players.get(k).setRole(PlayerInGame.ROLE.NORMAL);
+		}
+		System.out.println(players.get(randomPlayerIndex).getPlayer().getName() + " è stato scelto come dealer");
+		
     	$g.setStatus(Game.GAME_STATUS.BEGIN);
     	$g.setPhaseStatus(Game.PHASE_STATUS.DEAL_CARDS);
     	update($g);
@@ -29,7 +66,18 @@ rule "Game BEGIN, the dealer deals 7 cards to each player."
 		)
 		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
 	then
-		$g.dealCardsToPlayers($dealer, Game.CARDS_TO_DEAL);
+		System.out.println("Il dealer distribuisce " + Game.CARDS_TO_DEAL + " carte a ciascun giocatore in senso orario");
+		
+		System.out.println();
+		ArrayList<PlayerCards> playersCards = $g.dealCardsToPlayers($dealer, Game.CARDS_TO_DEAL);
+		for(PlayerCards playerCard : playersCards){
+			System.out.println(playerCard.getPlayer().getPlayer().getName() + " ha ricevuto le seguenti carte:");
+			for(Card card : playerCard.getCards()){
+				System.out.print(card + " ");
+			}
+			System.out.println();
+		}
+		
 		$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);
 		update($g);
 end
@@ -43,57 +91,49 @@ rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 		)
 		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
 	then
+		System.out.println();
+		System.out.println("Il dealer " + $dealer.getPlayer().getName() + " pesca la prima carta del gioco"); 
 		ArrayList<Card> cards = $g.dealCardsToPlayer($dealer, 1);
-		$g.playCards($dealer, cards);
-		$g.setPhaseStatus(Game.PHASE_STATUS.SOLVE_EFFECTS);
-		update($g);
-end
-
-
-rule "PLAYING CARDS not empty, resolve cards effects if possible"
-	when 
-		$g : Game(
-			status == Game.GAME_STATUS.BEGIN,
-			phaseStatus == Game.PHASE_STATUS.SOLVE_EFFECTS,
-			$playingCards : playingCards,
-			$players : playersInGame
-		)
-		$dealer : PlayerInGame(role == PlayerInGame.ROLE.DEALER) from $players
-	then
-		if($playingCards != null && $playingCards.getCards().size() == 1){
-			Card playingCard = $playingCards.getCards().remove(0);
-			$g.setPlayingCard(playingCard);
-			$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_FIRST_CARD);
+		System.out.println($dealer.getPlayer().getName() + " ha pescato: " + cards.get(0));
+		
+		Card cardDrawn = cards.get(0);
+		if(cardDrawn.getType() == Card.CARD_TYPE.ACTION && ((ActionCard)cardDrawn).getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
+			System.out.println(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR + "non può essere giocato il primo");
+			System.out.println("La carta verrà rimessa nel mazzo e si procederà ad un nuovo ripescaggio");
+			$g.putAndShuffle(cardDrawn);
 		}
-		else {			
+		else {
 			$g.setStatus(Game.GAME_STATUS.PLAY);
-			$g.setPhaseStatus(Game.PHASE_STATUS.PASS_TURN);
+			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+			$g.playCard($dealer, cardDrawn);
+			
 		}
+		
 		update($g);
 end
 
-rule "BEGIN, CHECK IF PLAYIED CARD IS NOT WILD_DRAW_FOUR. IF TRUE GO TO PLAY STATUS AND SOLVE EFFECTS OF CARD ELSE REPEAT DRAWING."
+rule "GAME PLAY, TURN_END, evaluate rapid effects if any"
 	when
 		$g : Game(
-			status == Game.GAME_STATUS.BEGIN,
-			phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
-			$playingCard : playingCard
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.TURN_END,
+			$rapidPendingCards : rapidPendingCards,
+			$rapidPendingCards.size() > 0
 		)
 	then
-		if($playingCard != null){
-			if($playingCard.type == Card.CARD_TYPE.ACTION && ((ActionCard) $playingCard).getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
-				$g.putAndShuffle($playingCard);
-				$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);
-			}
-			else {
-				$g.setStatus(Game.GAME_STATUS.PLAY);
-				$g.setPhaseStatus(Game.PHASE_STATUS.SOLVE_EFFECTS);
-			}
-		}
+		ArrayList<ActionCard> rapidPendingCards = ((ArrayList<ActionCard>)$rapidPendingCards);
+		ActionCard card = rapidPendingCards.remove(0);
+		$g.setCardToEvaluate(card);
 		update($g);
 end
 
-
-
-
-
+rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to the player that has the right according to the rules applied before"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.TURN_END,
+			$rapidPendingCards : rapidPendingCards,
+			$rapidPendingCards.size() == 0
+		)
+	then
+end

@@ -2,13 +2,13 @@ package com.sample;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.Collections;
-import java.util.Random;
 
 import com.sample.Cards.ActionCard;
 import com.sample.Cards.Card;
 import com.sample.Cards.NormalCard;
 import com.sample.Players.Player;
 import com.sample.Players.PlayerInGame;
+import com.sample.Utils.PlayerCard;
 import com.sample.Utils.PlayerCards;
 
 public class Game {
@@ -17,7 +17,7 @@ public class Game {
 	public static final int CARDS_TO_DEAL = 7;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
-	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, DRAW, RESPOND, SOLVE_EFFECTS, PLAY_CARDS, PASS_TURN};
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, DRAW, RESPOND, SOLVE_EFFECTS, PLAY_CARDS, TURN_END};
 	
 	public static enum GAME_DIRECTION {LEFT, RIGHT}
 	
@@ -26,12 +26,12 @@ public class Game {
 	private PHASE_STATUS phaseStatus = null;
 	private GAME_DIRECTION direction = GAME_DIRECTION.LEFT;
 	
-	private ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
-	private ArrayList<Card> pile = new ArrayList<Card>();//mazzo
-	private ArrayList<Card> discardPile = new ArrayList<Card>();//scarti
-	private PlayerCards playingCards;//pila di eventi che devono accadere
-	private Card playingCard;//ultima carta giocata
-	
+	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
+	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
+	private final ArrayList<Card> discardPile = new ArrayList<Card>();//scarti
+	private final ArrayList<PlayerCard> rapidPendingCards = new ArrayList<PlayerCard>(); //pila di eventi rapidi che devono accadere
+	private final ArrayList<PlayerCard> normalPendingCards = new ArrayList<PlayerCard>(); //pila di eventi lenti che devono accadere
+	private Card cardToEvaluate = null;
 	
 	/*COSTRUTTORI*/
 	
@@ -57,20 +57,6 @@ public class Game {
 	
 	/*FUNZIONI*/
 	
-	public void setPlayerRoles() {
-		Random rand = new Random();
-		int randomPlayerIndex = rand.nextInt(playersInGame.size());
-		for(int k=0;k<playersInGame.size(); k++) {
-			if(randomPlayerIndex == k) {
-				PlayerInGame dealer = playersInGame.get(k);
-				dealer.setRole(PlayerInGame.ROLE.DEALER);
-				dealer.setPlayerTurn(true);
-			}
-			else 
-				playersInGame.get(k).setRole(PlayerInGame.ROLE.NORMAL);
-		}
-	}
-	
 	public void createPile() {
 		NormalCard.COLOR[] colors = NormalCard.COLOR.values();
 		
@@ -84,8 +70,8 @@ public class Game {
 		
 		// quattro +4, quattro cambia colore
 		for(int k=0;k<4;k++) {
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD, false));
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR, false));
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD, true));
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR, true));
 		}
 		
 		for (int k=0;k<2;k++) {
@@ -109,12 +95,6 @@ public class Game {
 	
 	public void shufflePile() {
 		Collections.shuffle(pile);
-	}
-	
-	public void exchangePiles() {
-		ArrayList<Card> tmp = pile;
-		pile = discardPile;
-		discardPile = tmp;
 	}
 	
 	public ArrayList<PlayerCards> dealCardsToPlayers(PlayerInGame dealer, int number) {
@@ -149,10 +129,13 @@ public class Game {
 			}
 			else {
 				assert(discardPile.size() >= number - k);
-				Card card = discardPile.get(discardPile.size() - 1);
-				exchangePiles();
+				Card topCard = discardPile.remove(discardPile.size() - 1);
+				for(Card card : discardPile){
+					pile.add(card);
+				}
+				discardPile.clear();
+				discardPile.add(topCard);
 				shufflePile();
-				discardPile.add(card);
 				k--;
 			}
 		}
@@ -162,13 +145,26 @@ public class Game {
 		return cards;
 	}
 	
-	public void playCards(PlayerInGame p, ArrayList<Card> cards) {
+	public void playCard(PlayerInGame p, Card card) {
 		
-		for(Card card : cards) {
-			p.getCards().remove(card);
-			discardPile.add(card);
+		assert(discardPile.size() == 0 || discardPile.get(discardPile.size() - 1).getColor() == card.getColor() || card.getColor() == null);
+		
+		if(card.getClass() == ActionCard.class) {
+			
+			ActionCard actionCard = (ActionCard)card;
+			
+			if(actionCard.isQuick()) {
+				rapidPendingCards.add(new PlayerCard(p, card));
+				if(actionCard.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR) {
+					normalPendingCards.add(new PlayerCard(p, card));
+				}
+			}
+			else {
+				normalPendingCards.add(new PlayerCard(p, card));
+			}			
 		}
-		setPlayingCards(new PlayerCards(p, cards));
+		
+		discardPile.add(card);
 	}
 	
 	public void putAndShuffle(Card card) {
@@ -232,20 +228,20 @@ public class Game {
 		this.direction = direction;
 	}
 	
-	public PlayerCards getPlayingCards() {
-		return playingCards;
-	}
-
-	public void setPlayingCards(PlayerCards playingCards) {
-		this.playingCards = playingCards;
+	public ArrayList<PlayerCard> getRapidPendingCards() {
+		return rapidPendingCards;
 	}
 	
-	public Card getPlayingCard() {
-		return playingCard;
+	public ArrayList<PlayerCard> getNormalPendingCards() {
+		return normalPendingCards;
+	}
+	
+	public Card getCardToEvaluate() {
+		return cardToEvaluate;
 	}
 
-	public void setPlayingCard(Card playingCard) {
-		this.playingCard = playingCard;
+	public void setCardToEvaluate(Card cardToEvaluate) {
+		this.cardToEvaluate = cardToEvaluate;
 	}
 	
 	/*ELEMENTI PER DROOLS*/

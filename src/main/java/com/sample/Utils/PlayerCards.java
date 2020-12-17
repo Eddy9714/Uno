@@ -5,27 +5,19 @@ import com.sample.Players.PlayerInGame;
 
 public class PlayerCards {
 	
-	private ArrayList<Card> cards;
-	private PlayerInGame player;
+	private final ArrayList<Card> cards;
+	private final PlayerInGame player;
 	
 	public PlayerCards(PlayerInGame player, ArrayList<Card> cards) {
-		this.setCards(cards);
-		this.setPlayer(player);
+		this.cards = cards;
+		this.player = player;
 	}
 
 	public ArrayList<Card> getCards() {
 		return cards;
 	}
 
-	public void setCards(ArrayList<Card> cards) {
-		this.cards = cards;
-	}
-
 	public PlayerInGame getPlayer() {
 		return player;
-	}
-
-	public void setPlayer(PlayerInGame player) {
-		this.player = player;
 	}
 }
