@@ -102,8 +102,14 @@ rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 		}
 		else {
 			$g.playCard($dealer, cardDrawn);
-			$g.setStatus(Game.GAME_STATUS.PLAY);
-			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+			
+			if(cardDrawn.getType() == Card.CARD_TYPE.ACTION){
+				$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_FIRST_CARD); //TODO
+			}
+			else {
+				$g.setStatus(Game.GAME_STATUS.PLAY);
+				$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+			}
 		}
 		
 		update($g);

@@ -17,11 +17,12 @@ public class Game {
 	public static final int CARDS_TO_DEAL = 7;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
-	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, DRAW, ANSWER, SOLVE_EFFECTS, PLAY_CARDS, TURN_START, TURN_END};
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, DRAW, ANSWER, SOLVE_EFFECTS, PLAY_CARDS, TURN_START, TURN_END};
 	
 	private String id;
 	private GAME_STATUS status = GAME_STATUS.INIT;
 	private PHASE_STATUS phaseStatus = null;
+	
 	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
