@@ -18,7 +18,6 @@ public class Main {
 		Game g = new Game(p1, p2);
 		kSession.insert(g);
 		
-		int fired = kSession.fireAllRules();
-		
+		kSession.fireAllRules();
 	}
 }

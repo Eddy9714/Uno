@@ -2,6 +2,7 @@ package com.sample
 import com.sample.Game;
 import java.util.ArrayList;
 import com.sample.Players.PlayerInGame;
+import com.sample.Utils.PlayerCard;
 import com.sample.Utils.PlayerCards;
 import com.sample.Cards.Card;
 import com.sample.Cards.ActionCard;
@@ -72,10 +73,7 @@ rule "Game BEGIN, the dealer deals 7 cards to each player."
 		ArrayList<PlayerCards> playersCards = $g.dealCardsToPlayers($dealer, Game.CARDS_TO_DEAL);
 		for(PlayerCards playerCard : playersCards){
 			System.out.println(playerCard.getPlayer().getPlayer().getName() + " ha ricevuto le seguenti carte:");
-			for(Card card : playerCard.getCards()){
-				System.out.print(card + " ");
-			}
-			System.out.println();
+			$g.printPlayerHand(playerCard.getCards());
 		}
 		
 		$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);
@@ -103,27 +101,11 @@ rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 			$g.putAndShuffle(cardDrawn);
 		}
 		else {
+			$g.playCard($dealer, cardDrawn);
 			$g.setStatus(Game.GAME_STATUS.PLAY);
 			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-			$g.playCard($dealer, cardDrawn);
-			
 		}
 		
-		update($g);
-end
-
-rule "GAME PLAY, TURN_END, evaluate rapid effects if any"
-	when
-		$g : Game(
-			status == Game.GAME_STATUS.PLAY,
-			phaseStatus == Game.PHASE_STATUS.TURN_END,
-			$rapidPendingCards : rapidPendingCards,
-			$rapidPendingCards.size() > 0
-		)
-	then
-		ArrayList<ActionCard> rapidPendingCards = ((ArrayList<ActionCard>)$rapidPendingCards);
-		ActionCard card = rapidPendingCards.remove(0);
-		$g.setCardToEvaluate(card);
 		update($g);
 end
 
@@ -132,8 +114,205 @@ rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to the player that h
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.TURN_END,
-			$rapidPendingCards : rapidPendingCards,
-			$rapidPendingCards.size() == 0
-		)
+			$players: playersInGame
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then		
+		
+		$player.setPlayerTurn(false);
+		
+		int currentPlayerPosition = $players.indexOf($player);
+		
+		if($g.isDirectionLeft()){
+		
+			boolean foundOnTheLeft = false;
+			
+			for(int k=currentPlayerPosition - 1; k >= 0; k--){
+				PlayerInGame p = (PlayerInGame) $players.get(k);
+					
+				if(p.getBlockCounters() > 0){
+					p.setBlockCounters(p.getBlockCounters() - 1);
+				}
+				else {
+					p.setPlayerTurn(true);
+					foundOnTheLeft = true;
+					break;
+				}
+			}
+			
+			if(!foundOnTheLeft){
+				for(int k=$players.size() - 1; k >= currentPlayerPosition; k--){
+					PlayerInGame p = (PlayerInGame) $players.get(k);
+					
+					if(p.getBlockCounters() > 0){
+						p.setBlockCounters(p.getBlockCounters() - 1);
+					}
+					else {
+						p.setPlayerTurn(true);
+						break;
+					}
+				}
+			}
+		}
+		else {
+			boolean foundOnTheRight = false;
+			for(int k=currentPlayerPosition + 1; k < $players.size(); k++){
+				PlayerInGame p = (PlayerInGame) $players.get(k);
+				
+				if(p.getBlockCounters() > 0){
+					p.setBlockCounters(p.getBlockCounters() - 1);
+				}
+				else {
+					p.setPlayerTurn(true);
+					foundOnTheRight = true;
+					break;
+				}
+			}
+			
+			if(!foundOnTheRight){
+				for(int k=0; k <= currentPlayerPosition; k++){
+					PlayerInGame p = (PlayerInGame) $players.get(k);
+					
+					if(p.getBlockCounters() > 0){
+						p.setBlockCounters(p.getBlockCounters() - 1);
+					}
+					else {
+						p.setPlayerTurn(true);
+						break;
+					}
+				}
+			}
+		}
+		
+		System.out.println("Il turno di " + $player.getPlayer().getName() + " è terminato");
+		System.out.println();
+		
+		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_START);
+		
+		update($g);
+		
+end
+
+rule "GAME PLAY, TURN_START"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.TURN_START,
+			$players: playersInGame
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then
+		System.out.println("E' il turno di " + $player.getPlayer().getName());
+		System.out.println("La sua mano è la seguente:");
+		$g.printPlayerHand($player.getCards());
+		
+		$player.setHasDraw(false);
+		$player.setHasPlayedCards(false);
+		$g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+		
+		update($g);
+end
+
+rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he is not able to respond, cards effect need to be evaluated"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
+			$players: playersInGame,
+			$normalPendingCards : normalPendingCards,
+			$normalPendingCards.size() > 0
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then
+	
+end
+
+rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may play his cards"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
+			$players: playersInGame,
+			$normalPendingCards : normalPendingCards,
+			$normalPendingCards.size() == 0
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then
+	
+		ArrayList<Card> playableCards = $g.getPlayableCards($player.getCards(), false);
+		System.out.println();
+		System.out.println($player.getPlayer().getName() + " deve decidere che cosa fare:");
+		
+		ArrayList<String> options = new ArrayList<String>();
+		
+		for(int k=0; k<playableCards.size();k++){
+			options.add((k+1) + " - " + "Gioca " + playableCards.get(k));
+		}
+		
+		if($player.hasPlayedCards()){
+			options.add((options.size() + 1) + " - Passa il turno");
+		}
+		if(!$player.hasDraw()){
+			options.add((options.size() + 1) + " - Pesca");
+		}
+		
+		if(!$player.isUnoDeclared())
+			options.add((options.size() + 1) + " - Dichiara UNO");
+		
+		options.add((options.size() + 1) + " - UNO non dichiarato");
+		
+		
+		for(String option : options){
+			System.out.println(option);
+		}
+		
+		Scanner in = new Scanner(System.in);
+		int num = -1;
+		
+		do {
+			num = in.nextInt();
+			
+			if(num < 1 || num > options.size()){
+				System.out.println("Scegli un'opzione valida!");
+				System.out.println();
+			}
+			else {
+				if(num >= 1 && num <= playableCards.size()){
+					$g.playCard($player, playableCards.get(num - 1));
+					$player.setHasPlayedCards(true);
+				}
+				else if($player.hasPlayedCards() && num == playableCards.size() + 1){
+					$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+				}
+				else if(($player.hasPlayedCards() && num == playableCards.size() + 2) || (!$player.hasPlayedCards() && num == playableCards.size() + 1)){
+					Card card = $g.dealCardToPlayer($player);
+					System.out.println($player.getPlayer().getName() + " ha pescato: " + card);
+					$player.setHasDraw(true);
+				}
+				else if(false){
+					//TODO: Uno non dichiarato...
+				}
+				else if(false){
+					//TODO: Dichiara uno
+					if($player.getCards().size() == 1){
+						$player.setUnoDeclared(true);
+						System.out.println();
+						System.out.println($player.getPlayer().getName() + " esclama UNO!");
+					}
+				}
+			}
+		} while(num < 1 || num > options.size());
+		
+		update($g);
+end
+
+rule "GAME PLAY, DRAW. Player cannot play any card. Need to draw and play if possible"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.DRAW,
+			$players: playersInGame
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
 	then
 end

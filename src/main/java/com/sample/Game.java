@@ -17,21 +17,18 @@ public class Game {
 	public static final int CARDS_TO_DEAL = 7;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
-	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, DRAW, RESPOND, SOLVE_EFFECTS, PLAY_CARDS, TURN_END};
-	
-	public static enum GAME_DIRECTION {LEFT, RIGHT}
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, DRAW, ANSWER, SOLVE_EFFECTS, PLAY_CARDS, TURN_START, TURN_END};
 	
 	private String id;
 	private GAME_STATUS status = GAME_STATUS.INIT;
 	private PHASE_STATUS phaseStatus = null;
-	private GAME_DIRECTION direction = GAME_DIRECTION.LEFT;
+	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
 	private final ArrayList<Card> discardPile = new ArrayList<Card>();//scarti
-	private final ArrayList<PlayerCard> rapidPendingCards = new ArrayList<PlayerCard>(); //pila di eventi rapidi che devono accadere
 	private final ArrayList<PlayerCard> normalPendingCards = new ArrayList<PlayerCard>(); //pila di eventi lenti che devono accadere
-	private Card cardToEvaluate = null;
+	private PlayerCard cardToEvaluate = null;
 	
 	/*COSTRUTTORI*/
 	
@@ -117,6 +114,9 @@ public class Game {
 		return list;
 	}
 	
+	public Card dealCardToPlayer(PlayerInGame p) {
+		return dealCardsToPlayer(p, 1).get(0);
+	}
 	
 	public ArrayList<Card> dealCardsToPlayer(PlayerInGame p, int number) {
 		assert(number >= 0);
@@ -147,30 +147,75 @@ public class Game {
 	
 	public void playCard(PlayerInGame p, Card card) {
 		
-		assert(discardPile.size() == 0 || discardPile.get(discardPile.size() - 1).getColor() == card.getColor() || card.getColor() == null);
+		assert(isCardPlayable(card, false));
+		
+		p.removeCard(card);
+		discardPile.add(card);
 		
 		if(card.getClass() == ActionCard.class) {
-			
 			ActionCard actionCard = (ActionCard)card;
 			
 			if(actionCard.isQuick()) {
-				rapidPendingCards.add(new PlayerCard(p, card));
-				if(actionCard.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR) {
-					normalPendingCards.add(new PlayerCard(p, card));
-				}
+				setCardToEvaluate(new PlayerCard(p, card)); 
 			}
-			else {
-				normalPendingCards.add(new PlayerCard(p, card));
-			}			
+			else normalPendingCards.add(new PlayerCard(p, card));		
 		}
 		
-		discardPile.add(card);
 	}
 	
 	public void putAndShuffle(Card card) {
 		discardPile.remove(card);
 		pile.add(card);
 		shufflePile();
+	}
+	
+	public void printPlayerHand(ArrayList<Card> cards) {
+		for(Card card : cards){
+			System.out.print(card + " ");
+		}
+		System.out.println();
+	}
+	
+	public ArrayList<Card> getPlayableCards(ArrayList<Card> cards, boolean asAnswer) {
+		ArrayList<Card> playableCards = new ArrayList<Card>();
+		
+		for(Card card : cards) {
+			if(isCardPlayable(card, asAnswer)){
+				playableCards.add(card);
+			}
+		}
+		
+		return playableCards;
+	}
+	
+	private boolean isCardPlayable(Card card, boolean asAnswer) {
+		
+		Card lastCard = null;
+		
+		if(discardPile.size() > 0) {
+			lastCard = discardPile.get(discardPile.size() - 1);
+		}
+		
+		if(lastCard == null)
+			return true;
+		
+		if(lastCard.getClass() == ActionCard.class) {
+			
+			boolean actionAsAnswerPlayableConditions = card.getClass() == ActionCard.class
+					&& ((ActionCard)card).getActionType() == ((ActionCard)lastCard).getActionType()
+					&& ((ActionCard)card).getActionType() != ActionCard.ACTION_TYPE.WILD_DRAW_FOUR;
+			
+			if(asAnswer) {
+				return actionAsAnswerPlayableConditions;
+			}
+			else {
+				return actionAsAnswerPlayableConditions || lastCard.getColor() == card.getColor();
+			}
+		}
+		else {
+			return lastCard.getColor() == card.getColor() || (card.getClass() == NormalCard.class && 
+					((NormalCard)card).getNumber() == ((NormalCard)lastCard).getNumber());
+		}
 	}
 	
 	/* SETTER/GETTER */
@@ -220,27 +265,23 @@ public class Game {
 		return playersInGame.remove(p);
 	}
 	
-	public GAME_DIRECTION getDirection() {
-		return direction;
-	}
-
-	public void setDirection(GAME_DIRECTION direction) {
-		this.direction = direction;
-	}
-	
-	public ArrayList<PlayerCard> getRapidPendingCards() {
-		return rapidPendingCards;
-	}
-	
 	public ArrayList<PlayerCard> getNormalPendingCards() {
 		return normalPendingCards;
 	}
 	
-	public Card getCardToEvaluate() {
+	public boolean isDirectionLeft() {
+		return directionLeft;
+	}
+
+	public void setDirectionLeft(boolean directionLeft) {
+		this.directionLeft = directionLeft;
+	}
+	
+	public PlayerCard getCardToEvaluate() {
 		return cardToEvaluate;
 	}
 
-	public void setCardToEvaluate(Card cardToEvaluate) {
+	public void setCardToEvaluate(PlayerCard cardToEvaluate) {
 		this.cardToEvaluate = cardToEvaluate;
 	}
 	
