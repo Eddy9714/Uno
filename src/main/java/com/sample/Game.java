@@ -84,8 +84,8 @@ public class Game {
 		
 		// quattro +4, quattro cambia colore
 		for(int k=0;k<4;k++) {
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD));
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR));
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD, false));
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR, false));
 		}
 		
 		for (int k=0;k<2;k++) {
@@ -98,9 +98,9 @@ public class Game {
 			
 			//Carte speciali
 			for(int i=0;i<colors.length; i++) {
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i]));
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, colors[i]));
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i]));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i], true));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, colors[i], true));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i], false));
 			}
 		}
 		

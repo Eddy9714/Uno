@@ -12,6 +12,7 @@ public class PlayerInGame{
 	private ROLE role;
 	private ArrayList<Card> cards = new ArrayList<Card>();
 	private boolean playerTurn = false;//decide il turno semaforo
+	private boolean isBlocked = false; //stabilisce se il giocatore deve passare il turno
 	
 	public PlayerInGame(Player p) {
 		this.player = p;
@@ -53,5 +54,13 @@ public class PlayerInGame{
 	public void addCards(ArrayList<Card> cards) {
 		for(Card card : cards)
 			addCard(card);
+	}
+
+	public boolean isBlocked() {
+		return isBlocked;
+	}
+
+	public void setBlocked(boolean isBlocked) {
+		this.isBlocked = isBlocked;
 	}
 }

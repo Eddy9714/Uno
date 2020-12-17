@@ -18,9 +18,7 @@ public class Main {
 		Game g = new Game(p1, p2);
 		kSession.insert(g);
 		
-		g.setStatus(Game.GAME_STATUS.READY);
-		System.out.println(g.getStatus());
 		int fired = kSession.fireAllRules();
-		System.out.println(g.getPlayersInGame().get(0).getCards().size());
+		
 	}
 }
