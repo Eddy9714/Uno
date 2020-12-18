@@ -5,9 +5,12 @@ import java.util.Collections;
 
 import com.sample.Cards.ActionCard;
 import com.sample.Cards.Card;
+import com.sample.Cards.PlayedCard;
 import com.sample.Cards.NormalCard;
 import com.sample.Players.Player;
 import com.sample.Players.PlayerInGame;
+import com.sample.Utils.CardTest;
+import com.sample.Utils.CardsTest;
 import com.sample.Utils.PlayerCard;
 import com.sample.Utils.PlayerCards;
 
@@ -20,6 +23,7 @@ public class Game {
 	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, DRAW, ANSWER, SOLVE_EFFECTS, PLAY_CARDS, TURN_START, TURN_END};
 	
 	private String id;
+	private int turn = 1;
 	private GAME_STATUS status = GAME_STATUS.INIT;
 	private PHASE_STATUS phaseStatus = null;
 	
@@ -27,7 +31,7 @@ public class Game {
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
-	private final ArrayList<Card> discardPile = new ArrayList<Card>();//scarti
+	private final ArrayList<PlayedCard> discardPile = new ArrayList<PlayedCard>();//scarti
 	private final ArrayList<PlayerCard> normalPendingCards = new ArrayList<PlayerCard>(); //pila di eventi lenti che devono accadere
 	private PlayerCard cardToEvaluate = null;
 	
@@ -130,9 +134,9 @@ public class Game {
 			}
 			else {
 				assert(discardPile.size() >= number - k);
-				Card topCard = discardPile.remove(discardPile.size() - 1);
-				for(Card card : discardPile){
-					pile.add(card);
+				PlayedCard topCard = discardPile.remove(discardPile.size() - 1);
+				for(PlayedCard cardPlayed : discardPile){
+					pile.add(cardPlayed.getCard());
 				}
 				discardPile.clear();
 				discardPile.add(topCard);
@@ -146,26 +150,27 @@ public class Game {
 		return cards;
 	}
 	
-	public void playCard(PlayerInGame p, Card card) {
+	public void playCard(PlayerInGame p, int index) {
 		
-		assert(isCardPlayable(card, false));
+		assert(index < p.getCards().size() && index >= 0);
 		
-		p.removeCard(card);
-		discardPile.add(card);
+		assert(isCardPlayable(p, p.getCards().get(index), false));
 		
-		if(card.getClass() == ActionCard.class) {
-			ActionCard actionCard = (ActionCard)card;
+		discardPile.add(new PlayedCard(p.getCards().get(index), p, turn));
+		
+		if(p.getCards().get(index).getClass() == ActionCard.class) {
+			ActionCard actionCard = (ActionCard)p.getCards().get(index);
 			
 			if(actionCard.isQuick()) {
-				setCardToEvaluate(new PlayerCard(p, card)); 
+				setCardToEvaluate(new PlayerCard(p, p.getCards().get(index))); 
 			}
-			else normalPendingCards.add(new PlayerCard(p, card));		
+			else normalPendingCards.add(new PlayerCard(p, p.getCards().get(index)));		
 		}
 		
+		p.removeCard(p.getCards().get(index));
 	}
 	
 	public void putAndShuffle(Card card) {
-		discardPile.remove(card);
 		pile.add(card);
 		shufflePile();
 	}
@@ -177,11 +182,11 @@ public class Game {
 		System.out.println();
 	}
 	
-	public ArrayList<Card> getPlayableCards(ArrayList<Card> cards, boolean asAnswer) {
+	public ArrayList<Card> getPlayableCards(PlayerInGame p, boolean asAnswer) {
 		ArrayList<Card> playableCards = new ArrayList<Card>();
 		
-		for(Card card : cards) {
-			if(isCardPlayable(card, asAnswer)){
+		for(Card card : p.getCards()) {
+			if(isCardPlayable(p, card, asAnswer)){
 				playableCards.add(card);
 			}
 		}
@@ -189,9 +194,9 @@ public class Game {
 		return playableCards;
 	}
 	
-	private boolean isCardPlayable(Card card, boolean asAnswer) {
+	private boolean isCardPlayable(PlayerInGame p, Card card, boolean asAnswer) {
 		
-		Card lastCard = null;
+		PlayedCard lastCard = null;
 		
 		if(discardPile.size() > 0) {
 			lastCard = discardPile.get(discardPile.size() - 1);
@@ -200,22 +205,47 @@ public class Game {
 		if(lastCard == null)
 			return true;
 		
-		if(lastCard.getClass() == ActionCard.class) {
+		CardTest isNormalCard = cardToTest -> {
+			return cardToTest.getType() == Card.CARD_TYPE.NORMAL;
+		};
+		
+		CardTest isActionCard = cardToTest -> {
+			return cardToTest.getType() == Card.CARD_TYPE.ACTION;
+		};
+		
+		CardsTest sameActionCard = (cardToTest, lastPlayedCard) -> {
+			assert(isActionCard.test(cardToTest));
+			assert(isActionCard.test(lastPlayedCard.getCard()));
 			
-			boolean actionAsAnswerPlayableConditions = card.getClass() == ActionCard.class
-					&& ((ActionCard)card).getActionType() == ((ActionCard)lastCard).getActionType()
-					&& ((ActionCard)card).getActionType() != ActionCard.ACTION_TYPE.WILD_DRAW_FOUR;
+			return ((ActionCard)cardToTest).getActionType() == ((ActionCard)(lastPlayedCard.getCard())).getActionType();
+		};
+		
+		CardsTest sameNumber = (cardToTest, lastPlayedCard) -> {
+			assert(isNormalCard.test(cardToTest));
+			assert(isNormalCard.test(lastPlayedCard.getCard()));
 			
-			if(asAnswer) {
-				return actionAsAnswerPlayableConditions;
-			}
-			else {
-				return actionAsAnswerPlayableConditions || lastCard.getColor() == card.getColor();
-			}
+			return ((NormalCard)cardToTest).getNumber() == ((NormalCard)(lastPlayedCard.getCard())).getNumber();
+		};
+		
+		CardsTest sameColor = (cardToTest, lastPlayedCard) -> {
+			return cardToTest.getColor() == lastPlayedCard.getCard().getColor();
+		};
+		
+		
+		if(asAnswer) {
+			return isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard);
 		}
 		else {
-			return lastCard.getColor() == card.getColor() || (card.getClass() == NormalCard.class && 
-					((NormalCard)card).getNumber() == ((NormalCard)lastCard).getNumber());
+			if(lastCard.getTurn() != this.getTurn() || lastCard.getPlayer() != p) {
+				return (
+					(isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard)) || 
+					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && (sameNumber.test(card, lastCard) || sameColor.test(card, lastCard)))
+				);
+			}
+			else return (
+					(isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard)) || 
+					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && sameNumber.test(card, lastCard))
+				);
 		}
 	}
 	
@@ -284,6 +314,14 @@ public class Game {
 
 	public void setCardToEvaluate(PlayerCard cardToEvaluate) {
 		this.cardToEvaluate = cardToEvaluate;
+	}
+	
+	public int getTurn() {
+		return turn;
+	}
+
+	public void setTurn(int turn) {
+		this.turn = turn;
 	}
 	
 	/*ELEMENTI PER DROOLS*/
