@@ -14,7 +14,7 @@ public class PlayerInGame{
 	private boolean playerTurn = false;//decide il turno semaforo
 	private int blockCounters = 0; //stabilisce il numero di volte che un giocatore deve passare il turno
 	
-	private boolean hasDraw = false;
+	private boolean hasDrawn = false;
 	private boolean hasPlayedCards = false;
 	private boolean unoDeclared = false;
 	
@@ -85,12 +85,12 @@ public class PlayerInGame{
 		this.unoDeclared = unoDeclared;
 	}
 
-	public boolean hasDraw() {
-		return hasDraw;
+	public boolean hasDrawn() {
+		return hasDrawn;
 	}
 
-	public void setHasDraw(boolean hasDraw) {
-		this.hasDraw = hasDraw;
+	public void setHasDrawn(boolean hasDraw) {
+		this.hasDrawn = hasDraw;
 	}
 
 	public boolean hasPlayedCards() {

@@ -11,7 +11,6 @@ import com.sample.Players.Player;
 import com.sample.Players.PlayerInGame;
 import com.sample.Utils.CardTest;
 import com.sample.Utils.CardsTest;
-import com.sample.Utils.PlayerCard;
 import com.sample.Utils.PlayerCards;
 
 public class Game {
@@ -20,10 +19,11 @@ public class Game {
 	public static final int CARDS_TO_DEAL = 7;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
-	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, DRAW, ANSWER, SOLVE_EFFECTS, PLAY_CARDS, TURN_START, TURN_END};
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, ANSWER, EVAL_CARD, PLAY_CARDS, TURN_START, TURN_END};
 	
 	private String id;
 	private int turn = 1;
+	private int lastSkippedPlayerIndex = -1;
 	private GAME_STATUS status = GAME_STATUS.INIT;
 	private PHASE_STATUS phaseStatus = null;
 	
@@ -31,9 +31,11 @@ public class Game {
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
+
 	private final ArrayList<PlayedCard> discardPile = new ArrayList<PlayedCard>();//scarti
-	private final ArrayList<PlayerCard> normalPendingCards = new ArrayList<PlayerCard>(); //pila di eventi lenti che devono accadere
-	private PlayerCard cardToEvaluate = null;
+
+	private final ArrayList<PlayedCard> normalPendingCards = new ArrayList<PlayedCard>(); //pila di eventi lenti che devono accadere
+	private PlayedCard cardToEvaluate = null;
 	
 	/*COSTRUTTORI*/
 	
@@ -156,15 +158,17 @@ public class Game {
 		
 		assert(isCardPlayable(p, p.getCards().get(index), false));
 		
-		discardPile.add(new PlayedCard(p.getCards().get(index), p, turn));
+		PlayedCard playedCard = new PlayedCard(p, index, turn);
+		
+		discardPile.add(playedCard);
 		
 		if(p.getCards().get(index).getClass() == ActionCard.class) {
 			ActionCard actionCard = (ActionCard)p.getCards().get(index);
 			
 			if(actionCard.isQuick()) {
-				setCardToEvaluate(new PlayerCard(p, p.getCards().get(index))); 
+				setCardToEvaluate(playedCard); 
 			}
-			else normalPendingCards.add(new PlayerCard(p, p.getCards().get(index)));		
+			else normalPendingCards.add(playedCard);		
 		}
 		
 		p.removeCard(p.getCards().get(index));
@@ -231,6 +235,9 @@ public class Game {
 			return cardToTest.getColor() == lastPlayedCard.getCard().getColor();
 		};
 		
+		CardTest noColor = (cardToTest) -> {
+			return cardToTest.getColor() == null;
+		};
 		
 		if(asAnswer) {
 			return isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard);
@@ -238,13 +245,14 @@ public class Game {
 		else {
 			if(lastCard.getTurn() != this.getTurn() || lastCard.getPlayer() != p) {
 				return (
+					sameColor.test(card, lastCard) || noColor.test(card) ||
 					(isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard)) || 
-					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && (sameNumber.test(card, lastCard) || sameColor.test(card, lastCard)))
+					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && sameNumber.test(card, lastCard))
 				);
 			}
 			else return (
 					(isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard)) || 
-					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && sameNumber.test(card, lastCard))
+					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && sameNumber.test(card, lastCard)) 
 				);
 		}
 	}
@@ -296,7 +304,7 @@ public class Game {
 		return playersInGame.remove(p);
 	}
 	
-	public ArrayList<PlayerCard> getNormalPendingCards() {
+	public ArrayList<PlayedCard> getNormalPendingCards() {
 		return normalPendingCards;
 	}
 	
@@ -308,11 +316,11 @@ public class Game {
 		this.directionLeft = directionLeft;
 	}
 	
-	public PlayerCard getCardToEvaluate() {
+	public PlayedCard getCardToEvaluate() {
 		return cardToEvaluate;
 	}
 
-	public void setCardToEvaluate(PlayerCard cardToEvaluate) {
+	public void setCardToEvaluate(PlayedCard cardToEvaluate) {
 		this.cardToEvaluate = cardToEvaluate;
 	}
 	
@@ -322,6 +330,22 @@ public class Game {
 
 	public void setTurn(int turn) {
 		this.turn = turn;
+	}
+	
+	public ArrayList<Card> getPile() {
+		return pile;
+	}
+	
+	public ArrayList<PlayedCard> getDiscardPile() {
+		return discardPile;
+	}
+	
+	public int getLastSkippedPlayerIndex() {
+		return lastSkippedPlayerIndex;
+	}
+
+	public void setLastSkippedPlayerIndex(int lastSkippedPlayerIndex) {
+		this.lastSkippedPlayerIndex = lastSkippedPlayerIndex;
 	}
 	
 	/*ELEMENTI PER DROOLS*/

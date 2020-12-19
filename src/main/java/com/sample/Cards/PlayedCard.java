@@ -7,8 +7,9 @@ public class PlayedCard {
 	private final Card card;
 	private final PlayerInGame player;
 	
-	public PlayedCard(Card card, PlayerInGame player, int turn) {
-		this.card = card;
+	public PlayedCard(PlayerInGame player, int cardIndex, int turn) {
+		assert(cardIndex >= 0 && cardIndex < player.getCards().size());
+		this.card = player.getCards().get(cardIndex);
 		this.player = player;
 		this.turn = turn;
 	}

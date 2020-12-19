@@ -17,6 +17,10 @@ public abstract class Card {
 		return color;
 	}
 	
+	public void setColor(COLOR color) {
+		this.color = color;
+	}
+	
 	public CARD_TYPE getType() {
 		return type;
 	}
