@@ -2,7 +2,7 @@ package com.sample.Utils;
 
 public class Option {
 	
-	public static enum TYPE {COLOR_CHOICE, CARD_CHOICE, PASS_TURN, DRAW, DECLARE_UNO, CHARGE_UNO_MISSED}; 
+	public static enum TYPE {COLOR_CHOICE, CARD_CHOICE, PASS_TURN, DRAW, DECLARE_UNO, CHARGE_UNO_MISSED, CHOICE_YES, CHOICE_NO}; 
 	private final TYPE type;
 	private final String message;
 	

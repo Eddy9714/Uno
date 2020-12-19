@@ -36,6 +36,7 @@ public class Game {
 
 	private final ArrayList<PlayedCard> normalPendingCards = new ArrayList<PlayedCard>(); //pila di eventi lenti che devono accadere
 	private PlayedCard cardToEvaluate = null;
+	private boolean stackSolved = false;
 	
 	/*COSTRUTTORI*/
 	
@@ -156,7 +157,12 @@ public class Game {
 		
 		assert(index < p.getCards().size() && index >= 0);
 		
-		assert(isCardPlayable(p, p.getCards().get(index), false));
+		PlayedCard lastCard = null;
+		
+		if(discardPile.size() > 0)
+			lastCard = discardPile.get(discardPile.size() - 1);
+		
+		assert(isCardPlayable(p, p.getCards().get(index), lastCard, false));
 		
 		PlayedCard playedCard = new PlayedCard(p, index, turn);
 		
@@ -167,6 +173,9 @@ public class Game {
 			
 			if(actionCard.isQuick()) {
 				setCardToEvaluate(playedCard); 
+				
+				if(actionCard.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR)
+					normalPendingCards.add(playedCard);
 			}
 			else normalPendingCards.add(playedCard);		
 		}
@@ -179,34 +188,44 @@ public class Game {
 		shufflePile();
 	}
 	
-	public void printPlayerHand(ArrayList<Card> cards) {
+	public void printCardsList(ArrayList<Card> cards) {
 		for(Card card : cards){
 			System.out.print(card + " ");
 		}
 		System.out.println();
 	}
 	
+	public void printActionStack() {
+		for(PlayedCard playedCard : normalPendingCards){
+			System.out.print(playedCard.getCard() + " ");
+		}
+		System.out.println();
+	}
+	
 	public ArrayList<Card> getPlayableCards(PlayerInGame p, boolean asAnswer) {
+		PlayedCard lastCard = null;
+		
+		if(discardPile.size() > 0)
+			lastCard = discardPile.get(discardPile.size() - 1);
+		
+		return getPlayableCards(p, lastCard, asAnswer);
+	}
+	
+	public ArrayList<Card> getPlayableCards(PlayerInGame p, PlayedCard playedCard, boolean asAnswer) {
 		ArrayList<Card> playableCards = new ArrayList<Card>();
 		
 		for(Card card : p.getCards()) {
-			if(isCardPlayable(p, card, asAnswer)){
+			if(isCardPlayable(p, card, playedCard, asAnswer)){
 				playableCards.add(card);
 			}
 		}
 		
 		return playableCards;
 	}
+
 	
-	private boolean isCardPlayable(PlayerInGame p, Card card, boolean asAnswer) {
-		
-		PlayedCard lastCard = null;
-		
-		if(discardPile.size() > 0) {
-			lastCard = discardPile.get(discardPile.size() - 1);
-		}
-		
-		if(lastCard == null)
+	private boolean isCardPlayable(PlayerInGame p, Card card, PlayedCard playedCard, boolean asAnswer) {		
+		if(playedCard == null)
 			return true;
 		
 		CardTest isNormalCard = cardToTest -> {
@@ -240,19 +259,19 @@ public class Game {
 		};
 		
 		if(asAnswer) {
-			return isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard);
+			return isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard);
 		}
 		else {
-			if(lastCard.getTurn() != this.getTurn() || lastCard.getPlayer() != p) {
+			if(playedCard.getTurn() != this.getTurn() || playedCard.getPlayer() != p) {
 				return (
-					sameColor.test(card, lastCard) || noColor.test(card) ||
-					(isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard)) || 
-					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && sameNumber.test(card, lastCard))
+					sameColor.test(card, playedCard) || noColor.test(card) ||
+					(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
+					(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard))
 				);
 			}
 			else return (
-					(isActionCard.test(card) && isActionCard.test(lastCard.getCard()) && sameActionCard.test(card, lastCard)) || 
-					(isNormalCard.test(card) && isNormalCard.test(lastCard.getCard()) && sameNumber.test(card, lastCard)) 
+					(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
+					(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard)) 
 				);
 		}
 	}
@@ -346,6 +365,14 @@ public class Game {
 
 	public void setLastSkippedPlayerIndex(int lastSkippedPlayerIndex) {
 		this.lastSkippedPlayerIndex = lastSkippedPlayerIndex;
+	}
+	
+	public boolean isStackSolved() {
+		return stackSolved;
+	}
+
+	public void setStackSolved(boolean stackSolved) {
+		this.stackSolved = stackSolved;
 	}
 	
 	/*ELEMENTI PER DROOLS*/
