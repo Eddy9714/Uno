@@ -24,6 +24,7 @@ rule "GAME INIT"
 		update($g);
 end
 
+
 rule "Game READY, create pile, select dealer"
     when
 		$g : Game(
@@ -59,6 +60,7 @@ rule "Game READY, create pile, select dealer"
     	update($g);
 end
 
+
 rule "Game BEGIN, the dealer deals 7 cards to each player."
 	when
 		$g : Game(
@@ -80,6 +82,7 @@ rule "Game BEGIN, the dealer deals 7 cards to each player."
 		$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);
 		update($g);
 end
+
 
 rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 	when
@@ -116,6 +119,7 @@ rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 		update($g);
 end
 
+
 rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to next player"
 	when
 		$g : Game(
@@ -141,6 +145,7 @@ rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to next player"
 		update($g);
 		
 end
+
 
 rule "GAME PLAY, TURN_START"
 	when
@@ -176,6 +181,7 @@ rule "GAME PLAY, TURN_START"
 		
 		update($g);
 end
+
 
 rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he is not able to respond, cards effect need to be evaluated"
 	when// Il giocatore deve rispondere agli effetti lenti delle carte. Se non è in grado di rispondere, è necessario valutare l'effetto delle carte
@@ -319,6 +325,7 @@ rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he i
 		update($g);
 end
 
+
 rule "GAME PLAY, STACK SOLVED"
 	when
 		$g : Game(
@@ -331,6 +338,7 @@ rule "GAME PLAY, STACK SOLVED"
 		$g.setStackSolved(true);
 		update($g);
 end
+
 
 rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may play his cards"
 	when// Effetto delle carte valutato (se presente). Ora il giocatore può giocare le sue carte
@@ -445,6 +453,7 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 		update($g);
 end
 
+
 /*ESECUZIONE DELLE CARTE SPECIALI*/
 
 rule "EVAL RAPID ACTION CARD REVERSE"
@@ -465,6 +474,7 @@ rule "EVAL RAPID ACTION CARD REVERSE"
 		$g.setCardToEvaluate(null);
 		update($g);
 end
+
 
 rule "EVAL RAPID ACTION CARD, SKIP"
 	when
@@ -495,6 +505,7 @@ rule "EVAL RAPID ACTION CARD, SKIP"
 		$g.setCardToEvaluate(null);
 		update($g);	
 end
+
 
 rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 	when
@@ -545,6 +556,7 @@ rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 		update($g);
 end
 
+
 rule "FIRST TURN, WILD CARD"//cambio colore
 	when
 		$g : Game(
@@ -593,5 +605,18 @@ rule "FIRST TURN, WILD CARD"//cambio colore
 		
 		$g.setCardToEvaluate(null);
 		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		update($g);
+end
+
+
+rule "CONTROLLO E HO VINTO"
+	when 
+		$g : Game(
+			status == Game.GAME_STATUS.TURN_STAR
+		)
+	then
+		System.out.println("La partita è stata creata con successo");
+		System.out.println("Sto attendendo che ci siano almeno due giocatori...");
+		$g.setStatus(Game.GAME_STATUS.READY);
 		update($g);
 end
