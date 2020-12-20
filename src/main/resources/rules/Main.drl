@@ -178,7 +178,7 @@ rule "GAME PLAY, TURN_START"
 end
 
 rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he is not able to respond, cards effect need to be evaluated"
-	when
+	when// Il giocatore deve rispondere agli effetti lenti delle carte. Se non è in grado di rispondere, è necessario valutare l'effetto delle carte
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
@@ -333,7 +333,7 @@ rule "GAME PLAY, STACK SOLVED"
 end
 
 rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may play his cards"
-	when
+	when// Effetto delle carte valutato (se presente). Ora il giocatore può giocare le sue carte
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
@@ -545,7 +545,7 @@ rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 		update($g);
 end
 
-rule "FIRST TURN, WILD CARD"
+rule "FIRST TURN, WILD CARD"//cambio colore
 	when
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
