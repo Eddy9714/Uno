@@ -33,7 +33,6 @@ public class Game {
 	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
-	private PlayerInGame lastPlayer = null;
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
 
 	private final ArrayList<PlayedCard> discardPile = new ArrayList<PlayedCard>();//scarti
@@ -80,12 +79,8 @@ public class Game {
 			
 			//Carte speciali
 			for(int i=0;i<colors.length; i++) {
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i], true));;
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i], true));;
 			}
-		}
-		
-		for(int k=0;k<4;k++) {
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, Card.COLOR.RED, true));
 		}
 	}
 	
@@ -372,14 +367,6 @@ public class Game {
 
 	public void setStackSolved(boolean stackSolved) {
 		this.stackSolved = stackSolved;
-	}
-	
-	public PlayerInGame getLastPlayer() {
-		return lastPlayer;
-	}
-
-	public void setLastPlayer(PlayerInGame lastPlayer) {
-		this.lastPlayer = lastPlayer;
 	}
 	
 	/*ELEMENTI PER DROOLS*/
