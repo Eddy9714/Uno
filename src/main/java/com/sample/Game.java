@@ -1,6 +1,9 @@
 package com.sample;
 import java.util.ArrayList;
 import java.util.UUID;
+
+import javax.persistence.CascadeType;
+
 import java.util.Collections;
 
 import com.sample.Cards.ActionCard;
@@ -30,6 +33,7 @@ public class Game {
 	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
+	private PlayerInGame lastPlayer = null;
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
 
 	private final ArrayList<PlayedCard> discardPile = new ArrayList<PlayedCard>();//scarti
@@ -61,6 +65,12 @@ public class Game {
 	}
 	
 	/*FUNZIONI*/
+	
+	public void createDeterministicPile() {
+		for(int k=0;k<108;k++) {
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, Card.COLOR.RED, true));
+		}
+	}
 	
 	public void createPile() {
 		NormalCard.COLOR[] colors = NormalCard.COLOR.values();
@@ -153,6 +163,8 @@ public class Game {
 		return cards;
 	}
 	
+	//setCardToEvaluate(new PlayedCard($player, indice_carta, turno))
+	
 	public void playCard(PlayerInGame p, int index) {
 		
 		assert(index < p.getCards().size() && index >= 0);
@@ -224,7 +236,7 @@ public class Game {
 	}
 
 	
-	private boolean isCardPlayable(PlayerInGame p, Card card, PlayedCard playedCard, boolean asAnswer) {		
+	public boolean isCardPlayable(PlayerInGame p, Card card, PlayedCard playedCard, boolean asAnswer) {		
 		if(playedCard == null)
 			return true;
 		
@@ -373,6 +385,14 @@ public class Game {
 
 	public void setStackSolved(boolean stackSolved) {
 		this.stackSolved = stackSolved;
+	}
+	
+	public PlayerInGame getLastPlayer() {
+		return lastPlayer;
+	}
+
+	public void setLastPlayer(PlayerInGame lastPlayer) {
+		this.lastPlayer = lastPlayer;
 	}
 	
 	/*ELEMENTI PER DROOLS*/

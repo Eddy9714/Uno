@@ -37,7 +37,9 @@ rule "Game READY, create pile, select dealer"
     	
     	System.out.println("Giocatori trovati: " + players.size());
     	System.out.println("Creo il mazzo");
-    	$g.createPile();
+    	
+    	$g.createDeterministicPile();
+    	//$g.createPile();
     	
     	System.out.println("Imposto il dealer");
     	Random rand = new Random();
@@ -93,10 +95,10 @@ rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 		System.out.println();
 		System.out.println("Il dealer " + $dealer.getPlayer().getName() + " pesca la prima carta del gioco"); 
 		Card cardDrawn = $g.dealCardToPlayer($dealer);
-		System.out.println($dealer.getPlayer().getName() + " ha pescato: " + cardDrawn);
+		System.out.println($dealer.getPlayer().getName() + " ha pescato e giocato: " + cardDrawn);
 		
 		if(cardDrawn.getType() == Card.CARD_TYPE.ACTION && ((ActionCard)cardDrawn).getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
-			System.out.println(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR + "non può essere giocato il primo");
+			System.out.println(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR + "non può essere giocato il primo turno");
 			System.out.println("La carta verrà rimessa nel mazzo e si procederà ad un nuovo ripescaggio");
 			$g.putAndShuffle(cardDrawn);
 		}
@@ -138,6 +140,8 @@ rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to next player"
 		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_START);
 		if($normalPendingCards.size() > 0)
 			$g.setStackSolved(false);
+			
+		$g.setLastPlayer($player);
 		update($g);
 		
 end
@@ -165,6 +169,8 @@ rule "GAME PLAY, TURN_START"
 		$player.setHasDrawn(false);
 		$player.setHasPlayedCards(false);
 		$player.setUnoDeclared(false);
+		$player.setHasCharged(false);
+		
 		$g.setLastSkippedPlayerIndex(-1);
 		
 		if($player.getBlockCounters() > 0){
@@ -239,6 +245,18 @@ rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he i
 						$g.printCardsList(lastStackedCardObj.getPlayer().getCards());
 						
 						ArrayList<Card> cards = $g.getPlayableCards(lastStackedCardObj.getPlayer(), $g.getDiscardPile().get($g.getDiscardPile().size() - 2), false);
+						
+						// WILD_DRAW_FOUR non è considerata una carta giocabile in alternativa ad una WILD_DRAW_FOUR
+						for(Card c : cards){
+							if(c.getType() == Card.CARD_TYPE.ACTION)
+							{
+								ActionCard ac = (ActionCard)c;
+								if(ac.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
+									cards.remove(c);
+								}
+							} 
+						}
+						
 						if(cards.size() > 0){
 							System.out.println($player.getPlayer().getName() + " ha indovinato!");
 							System.out.println(lastStackedCardObj.getPlayer().getPlayer().getName() + " poteva giocare: ");
@@ -338,6 +356,7 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
 			$players: playersInGame,
+			$lastPlayer : lastPlayer,
 			$normalPendingCards : normalPendingCards,
 			stackSolved == true
 		);
@@ -364,7 +383,7 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 		if(!$player.isUnoDeclared())
 			options.add(new Option(Option.TYPE.DECLARE_UNO, (options.size() + 1) + " - Dichiara UNO"));
 		
-		if(!$player.hasPlayedCards())
+		if(!$player.hasPlayedCards() && $lastPlayer != null && $player.hasCharged())
 			options.add(new Option(Option.TYPE.CHARGE_UNO_MISSED, (options.size() + 1) + " - UNO non dichiarato"));
 		
 		
@@ -411,20 +430,15 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 					$player.setHasDrawn(true);
 				}
 				else if(opt.getType() == Option.TYPE.CHARGE_UNO_MISSED){
-					
-					int currentPlayerPosition = $players.indexOf($player);
-					int nextPosition = Math.floorMod(currentPlayerPosition + ($g.isDirectionLeft() ? -1 : 1), $players.size());
-					PlayerInGame playerInGame = (PlayerInGame)($players.get(nextPosition));
-					if(playerInGame.isUnoDeclared())
-						System.out.println(playerInGame.getPlayer().getName() + " ha dichiarato precedentemente UNO!");
+					if($lastPlayer.isUnoDeclared())
+						System.out.println($lastPlayer.getPlayer().getName() + " ha dichiarato precedentemente UNO!");
 					else {
-						System.out.println(playerInGame.getPlayer().getName() + " non ha dichiarato UNO!");
-						System.out.println(playerInGame.getPlayer().getName() + " deve pescare 2 carte");
-						ArrayList<Card> drawnCards = $g.dealCardsToPlayer(playerInGame, 2);
-						System.out.println(playerInGame.getPlayer().getName() + " ha pescato: ");
+						System.out.println($lastPlayer.getPlayer().getName() + " non ha dichiarato UNO!");
+						System.out.println($lastPlayer.getPlayer().getName() + " deve pescare 2 carte");
+						ArrayList<Card> drawnCards = $g.dealCardsToPlayer($lastPlayer, 2);
+						System.out.println($lastPlayer.getPlayer().getName() + " ha pescato: ");
 						$g.printCardsList(drawnCards);
-						
-						//Rimuovere la possibilità di chiamare nuovamente uno mancato
+						$lastPlayer.setHasCharged(true);
 					}
 					//Controlla se il giocatore precedente ha dichiarato uno.
 				}
@@ -594,4 +608,34 @@ rule "FIRST TURN, WILD CARD"
 		$g.setCardToEvaluate(null);
 		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
 		update($g);
+end
+
+rule "DRAW_TWO AS THE FIRST CARD"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$players: playersInGame,
+			$cardToEvaluate : cardToEvaluate,
+			$card : ((ActionCard)cardToEvaluate.getCard()),
+			$card.getActionType() == ActionCard.ACTION_TYPE.DRAW_TWO
+		);
+	then
+		$g.setCardToEvaluate(null);
+		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		update($g)
+end
+
+rule "DRAW_TWO"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.EVAL_CARD,
+			$turn : turn,
+			$players: playersInGame,
+			$cardToEvaluate : cardToEvaluate,
+			$card : ((ActionCard)cardToEvaluate.getCard()),
+			$card.getActionType() == ActionCard.ACTION_TYPE.DRAW_TWO
+		);
+	then
 end

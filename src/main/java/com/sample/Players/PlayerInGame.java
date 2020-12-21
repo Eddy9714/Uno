@@ -17,6 +17,7 @@ public class PlayerInGame{
 	private boolean hasDrawn = false;
 	private boolean hasPlayedCards = false;
 	private boolean unoDeclared = false;
+	private boolean hasCharged = false;
 	
 	public PlayerInGame(Player p) {
 		this.player = p;
@@ -99,5 +100,13 @@ public class PlayerInGame{
 
 	public void setHasPlayedCards(boolean hasPlayedCards) {
 		this.hasPlayedCards = hasPlayedCards;
+	}
+
+	public boolean hasCharged() {
+		return hasCharged;
+	}
+
+	public void setHasCharged(boolean hasCharged) {
+		this.hasCharged = hasCharged;
 	}
 }
