@@ -609,14 +609,13 @@ rule "FIRST TURN, WILD CARD"//cambio colore
 end
 
 
-rule "CONTROLLO E HO VINTO"
-	when 
+rule "CONTROLLO SE HO VINTO"//
+	when //se ho solo una cartae, il semaforo "uno" è true allora ho vinto, altrimenti rimetto il semaforo false
 		$g : Game(
 			status == Game.GAME_STATUS.TURN_STAR
 		)
 	then
-		System.out.println("La partita è stata creata con successo");
-		System.out.println("Sto attendendo che ci siano almeno due giocatori...");
-		$g.setStatus(Game.GAME_STATUS.READY);
+		System.out.println("Hai solamente una carta, devi urlare UNO");
+		$g.setStatus(Game.GAME_STATUS.END);
 		update($g);
 end
