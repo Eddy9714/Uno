@@ -18,6 +18,7 @@ public class PlayerInGame{
 	private boolean hasPlayedCards = false;
 	private boolean unoDeclared = false;
 	private boolean hasCharged = false;
+	private boolean isFirst = false;
 	
 	public PlayerInGame(Player p) {
 		this.player = p;
@@ -108,5 +109,13 @@ public class PlayerInGame{
 
 	public void setHasCharged(boolean hasCharged) {
 		this.hasCharged = hasCharged;
+	}
+
+	public boolean isFirst() {
+		return isFirst;
+	}
+
+	public void setFirst(boolean isFirst) {
+		this.isFirst = isFirst;
 	}
 }

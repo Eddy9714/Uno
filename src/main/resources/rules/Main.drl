@@ -103,16 +103,19 @@ rule "Game BEGIN, the dealer draws 1 card and plays it if possible."
 			$g.putAndShuffle(cardDrawn);
 		}
 		else {
-			$g.playCard($dealer, $dealer.getCards().indexOf(cardDrawn));
-			
-			if(cardDrawn.getType() == Card.CARD_TYPE.ACTION){
-				$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_FIRST_CARD); 
+		
+			if(cardDrawn.getType() == Card.CARD_TYPE.ACTION && ((ActionCard)cardDrawn).getActionType() == ActionCard.ACTION_TYPE.REVERSE){
+				$dealer.setFirst(true);
 			}
 			else {
-				$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+				int currentPlayerPosition = $players.indexOf($dealer);
+				int nextPosition = Math.floorMod(currentPlayerPosition + ($g.isDirectionLeft() ? -1 : 1), $players.size());
+				((PlayerInGame)$players.get(nextPosition)).setFirst(true);
 			}
 			
+			$g.setCardToEvaluate(new PlayedCard($dealer, $dealer.getCards().indexOf(cardDrawn), 0));			
 			$g.setStatus(Game.GAME_STATUS.PLAY);
+			$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_FIRST_CARD);
 		}
 		
 		update($g);
@@ -156,10 +159,11 @@ rule "GAME PLAY, TURN_START"
 		$player : PlayerInGame(playerTurn == true) from $players;
 	then
 		
-		if($player.getRole() == PlayerInGame.ROLE.DEALER)
+		if($player.isFirst())
 			$g.setTurn($g.getTurn() + 1);
-			
-		System.out.println("Turno " + ($g.getTurn() + 1));
+		
+		System.out.println("-----------------------------------------------------------------------");
+		System.out.println("Turno " + $g.getTurn());
 		System.out.println("Ultima carta giocata: " + $g.getDiscardPile().get($g.getDiscardPile().size() - 1).getCard());
 		System.out.println();
 		System.out.println("E' il turno di " + $player.getPlayer().getName());
@@ -307,7 +311,7 @@ rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he i
 					Option opt = options.get(num - 1);
 					
 					if(opt.getType() == Option.TYPE.CARD_CHOICE){
-						$g.playCard($player, $player.getCards().indexOf(playableCards.get(num - 1)));
+						$g.setCardToEvaluate(new PlayedCard($player, $player.getCards().indexOf(playableCards.get(num - 1)), $g.getTurn()));
 		
 						System.out.println($player.getPlayer().getName() + " ha giocato: " + playableCards.get(num - 1));
 						$player.setHasPlayedCards(true);
@@ -383,9 +387,8 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 		if(!$player.isUnoDeclared())
 			options.add(new Option(Option.TYPE.DECLARE_UNO, (options.size() + 1) + " - Dichiara UNO"));
 		
-		if(!$player.hasPlayedCards() && $lastPlayer != null && $player.hasCharged())
+		if(!$player.hasPlayedCards() && $lastPlayer != null && !$player.hasCharged())
 			options.add(new Option(Option.TYPE.CHARGE_UNO_MISSED, (options.size() + 1) + " - UNO non dichiarato"));
-		
 		
 		for(Option option : options){
 			System.out.println(option.getMessage());
@@ -405,7 +408,7 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 				Option opt = options.get(num - 1);
 				
 				if(opt.getType() == Option.TYPE.CARD_CHOICE){
-					$g.playCard($player, $player.getCards().indexOf(playableCards.get(num - 1)));
+					$g.setCardToEvaluate(new PlayedCard($player, $player.getCards().indexOf(playableCards.get(num - 1)), $g.getTurn()));
 					
 					System.out.println($player.getPlayer().getName() + " ha giocato: " + playableCards.get(num - 1));
 					$player.setHasPlayedCards(true);
@@ -440,7 +443,6 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 						$g.printCardsList(drawnCards);
 						$lastPlayer.setHasCharged(true);
 					}
-					//Controlla se il giocatore precedente ha dichiarato uno.
 				}
 				else if(opt.getType() == Option.TYPE.DECLARE_UNO){
 					if($player.getCards().size() == 1){
@@ -466,17 +468,27 @@ rule "EVAL RAPID ACTION CARD REVERSE"
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.EVAL_CARD || phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$discardPile : discardPile,
 			$phaseStatus : phaseStatus,
 			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.REVERSE
 		);
 	then
 		$g.setDirectionLeft(!$g.isDirectionLeft());
 		System.out.println("La direzione di gioco è stata cambiata in senso " + ($g.isDirectionLeft() ? "orario" : "antiorario"));
-		$g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
-		
+
+		$discardPile.add($cardToEvaluate);
+		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
 		$g.setCardToEvaluate(null);
+		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) {
+			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_START);
+		}
+		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+		
 		update($g);
 end
 
@@ -485,11 +497,16 @@ rule "EVAL RAPID ACTION CARD, SKIP"
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.EVAL_CARD || phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$phaseStatus : phaseStatus,
+			$discardPile : discardPile,
 			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.SKIP,
 			$players: playersInGame
 		);
+		$player : PlayerInGame(playerTurn == true) from $players;
 	then
 		int index = $g.getLastSkippedPlayerIndex();
 		int epsilon = $g.isDirectionLeft() ? -1 : 1;
@@ -497,16 +514,26 @@ rule "EVAL RAPID ACTION CARD, SKIP"
 		int nextSkippedPlayerIndex = Math.floorMod((index == -1 ? $players.indexOf($cardToEvaluate.getPlayer()) + epsilon : index + epsilon), $players.size());
 				
 		PlayerInGame nextPlayerToSkip = (PlayerInGame)($players.get(nextSkippedPlayerIndex));
+		
+		//Stesso giocatore
+		if(nextPlayerToSkip.equals($player))
+		{
+			nextSkippedPlayerIndex = Math.floorMod(nextSkippedPlayerIndex + epsilon, $players.size());
+			nextPlayerToSkip = (PlayerInGame)($players.get(nextSkippedPlayerIndex));
+		}
+		
 		nextPlayerToSkip.setBlockCounters(nextPlayerToSkip.getBlockCounters() + 1);
 		System.out.println(nextPlayerToSkip.getPlayer().getName() + " dovrà saltare " + nextPlayerToSkip.getBlockCounters() + " turni");
 		
 		$g.setLastSkippedPlayerIndex(nextSkippedPlayerIndex);	
-		if($g.getPhaseStatus() == Game.PHASE_STATUS.EVAL_FIRST_CARD)
-			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-		else
-			$g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
-			
+		
+		$discardPile.add($cardToEvaluate);
+		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
 		$g.setCardToEvaluate(null);
+		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) $g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+		
 		update($g);	
 end
 
@@ -515,7 +542,11 @@ rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.EVAL_CARD,
+			$discardPile : discardPile,
 			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			$normalPendingCards : normalPendingCards,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.WILD || $card.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR
 		);
@@ -550,12 +581,17 @@ rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 		}
 		while(num < 1 || num > Card.COLOR.values().length);
 		
+		$discardPile.add($cardToEvaluate);
+		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
+		
+		$g.setCardToEvaluate(null);
+		
 		if($card.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
+			$normalPendingCards.add($cardToEvaluate);
 			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
 		}
 		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
 		
-		$g.setCardToEvaluate(null);
 		update($g);
 end
 
@@ -564,8 +600,11 @@ rule "FIRST TURN, WILD CARD"
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$discardPile : discardPile,
 			$players: playersInGame,
 			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.WILD
 		);
@@ -605,37 +644,59 @@ rule "FIRST TURN, WILD CARD"
 		}
 		while(num < 1 || num > Card.COLOR.values().length);
 		
+		$discardPile.add($cardToEvaluate);
+		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
 		$g.setCardToEvaluate(null);
+		
 		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
 		update($g);
-end
-
-rule "DRAW_TWO AS THE FIRST CARD"
-	when
-		$g : Game(
-			status == Game.GAME_STATUS.PLAY,
-			phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
-			$players: playersInGame,
-			$cardToEvaluate : cardToEvaluate,
-			$card : ((ActionCard)cardToEvaluate.getCard()),
-			$card.getActionType() == ActionCard.ACTION_TYPE.DRAW_TWO
-		);
-	then
-		$g.setCardToEvaluate(null);
-		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-		update($g)
 end
 
 rule "DRAW_TWO"
 	when
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
-			phaseStatus == Game.PHASE_STATUS.EVAL_CARD,
-			$turn : turn,
-			$players: playersInGame,
+			phaseStatus == Game.PHASE_STATUS.EVAL_CARD || phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$phaseStatus : phaseStatus,
+			$discardPile: discardPile,
 			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			$normalPendingCards: normalPendingCards,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.DRAW_TWO
 		);
 	then
+		$discardPile.add($cardToEvaluate);
+		$normalPendingCards.add($cardToEvaluate);
+		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
+		$g.setCardToEvaluate(null);
+		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) $g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+		
+		update($g);
+end
+
+rule "NORMAL CARD"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.EVAL_CARD || phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
+			$phaseStatus : phaseStatus,
+			$discardPile: discardPile,
+			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			$normalPendingCards: normalPendingCards,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.NORMAL
+		);
+	then
+		$discardPile.add($cardToEvaluate);
+		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
+		$g.setCardToEvaluate(null);
+		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) $g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+		
+		update($g);
 end

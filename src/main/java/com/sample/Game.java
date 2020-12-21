@@ -25,7 +25,7 @@ public class Game {
 	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, ANSWER, EVAL_CARD, PLAY_CARDS, TURN_START, TURN_END};
 	
 	private String id;
-	private int turn = 1;
+	private int turn = 0;
 	private int lastSkippedPlayerIndex = -1;
 	private GAME_STATUS status = GAME_STATUS.INIT;
 	private PHASE_STATUS phaseStatus = null;
@@ -67,8 +67,25 @@ public class Game {
 	/*FUNZIONI*/
 	
 	public void createDeterministicPile() {
-		for(int k=0;k<108;k++) {
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, Card.COLOR.RED, true));
+		NormalCard.COLOR[] colors = NormalCard.COLOR.values();
+		pile.clear();
+		
+		for (int k=0;k<2;k++) {
+			//Numeri da 1 a 9
+			for(int j=1;j<10;j++) {
+				for(int i=0;i<colors.length; i++) {
+					pile.add(new NormalCard(j, colors[i]));
+				}
+			}
+			
+			//Carte speciali
+			for(int i=0;i<colors.length; i++) {
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i], true));;
+			}
+		}
+		
+		for(int k=0;k<4;k++) {
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, Card.COLOR.RED, true));
 		}
 	}
 	
@@ -164,36 +181,6 @@ public class Game {
 	}
 	
 	//setCardToEvaluate(new PlayedCard($player, indice_carta, turno))
-	
-	public void playCard(PlayerInGame p, int index) {
-		
-		assert(index < p.getCards().size() && index >= 0);
-		
-		PlayedCard lastCard = null;
-		
-		if(discardPile.size() > 0)
-			lastCard = discardPile.get(discardPile.size() - 1);
-		
-		assert(isCardPlayable(p, p.getCards().get(index), lastCard, false));
-		
-		PlayedCard playedCard = new PlayedCard(p, index, turn);
-		
-		discardPile.add(playedCard);
-		
-		if(p.getCards().get(index).getClass() == ActionCard.class) {
-			ActionCard actionCard = (ActionCard)p.getCards().get(index);
-			
-			if(actionCard.isQuick()) {
-				setCardToEvaluate(playedCard); 
-				
-				if(actionCard.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR)
-					normalPendingCards.add(playedCard);
-			}
-			else normalPendingCards.add(playedCard);		
-		}
-		
-		p.removeCard(p.getCards().get(index));
-	}
 	
 	public void putAndShuffle(Card card) {
 		pile.add(card);
