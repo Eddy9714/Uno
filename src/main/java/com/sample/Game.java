@@ -16,8 +16,8 @@ import com.sample.Utils.PlayerCards;
 
 public class Game {
 	
-	public static final int MAX_PLAYERS = 10;
-	public static final int CARDS_TO_DEAL = 3;
+	public final int MAX_PLAYERS;
+	public static final int CARDS_TO_DEAL = 7;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
 	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, ANSWER, EVAL_CARD, MAIN, TURN_START, TURN_END};
@@ -41,20 +41,27 @@ public class Game {
 	
 	/*COSTRUTTORI*/
 	
-	public Game() {
+	public Game(int maxPlayers) {
+		assert(maxPlayers >= 2);
+		this.MAX_PLAYERS = maxPlayers;
 		id = UUID.randomUUID().toString();
 	}
 	
-	public Game(ArrayList<Player> players) {
+	public Game(int maxPlayers, ArrayList<Player> players) {
+		assert(maxPlayers >= 2);
+		this.MAX_PLAYERS = maxPlayers;
+		
 		id = UUID.randomUUID().toString();
 		for(Player p : players) {
 			if(!addPlayer(p))
 				break;
 		}
-			
 	}
 	
-	public Game(Player... players) {
+	public Game(int maxPlayers, Player... players) {
+		assert(maxPlayers >= 2);
+		this.MAX_PLAYERS = maxPlayers;
+		
 		id = UUID.randomUUID().toString();
 		for(Player p : players)
 			if(!addPlayer(p))
