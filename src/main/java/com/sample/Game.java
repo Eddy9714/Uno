@@ -2,8 +2,6 @@ package com.sample;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import javax.persistence.CascadeType;
-
 import java.util.Collections;
 
 import com.sample.Cards.ActionCard;
@@ -19,25 +17,25 @@ import com.sample.Utils.PlayerCards;
 public class Game {
 	
 	public static final int MAX_PLAYERS = 10;
-	public static final int CARDS_TO_DEAL = 7;
+	public static final int CARDS_TO_DEAL = 3;
 	
 	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
-	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, ANSWER, EVAL_CARD, PLAY_CARDS, TURN_START, TURN_END};
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, ANSWER, EVAL_CARD, MAIN, TURN_START, TURN_END};
 	
 	private String id;
 	private int turn = 0;
-	private int lastSkippedPlayerIndex = -1;
 	private GAME_STATUS status = GAME_STATUS.INIT;
 	private PHASE_STATUS phaseStatus = null;
 	
 	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
+	private boolean nextToSkip = false;
+	
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
 
 	private final ArrayList<PlayedCard> discardPile = new ArrayList<PlayedCard>();//scarti
-
-	private final ArrayList<PlayedCard> normalPendingCards = new ArrayList<PlayedCard>(); //pila di eventi lenti che devono accadere
+	
 	private PlayedCard cardToEvaluate = null;
 	private boolean stackSolved = false;
 	
@@ -69,17 +67,10 @@ public class Game {
 		NormalCard.COLOR[] colors = NormalCard.COLOR.values();
 		pile.clear();
 		
-		for (int k=0;k<2;k++) {
-			//Numeri da 1 a 9
-			for(int j=1;j<10;j++) {
-				for(int i=0;i<colors.length; i++) {
-					pile.add(new NormalCard(j, colors[i]));
-				}
-			}
-			
+		for (int k=0;k<30;k++) {			
 			//Carte speciali
 			for(int i=0;i<colors.length; i++) {
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i], true));;
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i]));;
 			}
 		}
 	}
@@ -97,8 +88,8 @@ public class Game {
 		
 		// quattro +4, quattro cambia colore
 		for(int k=0;k<4;k++) {
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD, true));
-			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR, true));
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD));
+			pile.add(new ActionCard(ActionCard.ACTION_TYPE.WILD_DRAW_FOUR));
 		}
 		
 		for (int k=0;k<2;k++) {
@@ -111,13 +102,15 @@ public class Game {
 			
 			//Carte speciali
 			for(int i=0;i<colors.length; i++) {
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i], true));
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, colors[i], true));
-				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i], false));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.SKIP, colors[i]));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.REVERSE, colors[i]));
+				pile.add(new ActionCard(ActionCard.ACTION_TYPE.DRAW_TWO, colors[i]));
 			}
 		}
 		
-		shufflePile();
+		for(int k=0;k<100;k++) {
+			shufflePile();
+		}
 	}
 	
 	public void shufflePile() {
@@ -175,8 +168,6 @@ public class Game {
 		return cards;
 	}
 	
-	//setCardToEvaluate(new PlayedCard($player, indice_carta, turno))
-	
 	public void putAndShuffle(Card card) {
 		pile.add(card);
 		shufflePile();
@@ -189,36 +180,38 @@ public class Game {
 		System.out.println();
 	}
 	
-	public void printActionStack() {
-		for(PlayedCard playedCard : normalPendingCards){
-			System.out.print(playedCard.getCard() + " ");
-		}
-		System.out.println();
-	}
-	
-	public ArrayList<Card> getPlayableCards(PlayerInGame p, boolean asAnswer) {
+	public ArrayList<Card> getPlayableCards(PlayerInGame p) {
 		PlayedCard lastCard = null;
 		
 		if(discardPile.size() > 0)
 			lastCard = discardPile.get(discardPile.size() - 1);
 		
-		return getPlayableCards(p, lastCard, asAnswer);
+		return getPlayableCards(p, lastCard);
 	}
 	
-	public ArrayList<Card> getPlayableCards(PlayerInGame p, PlayedCard playedCard, boolean asAnswer) {
+	public ArrayList<Card> getPlayableCards(PlayerInGame p, PlayedCard playedCard) {
 		ArrayList<Card> playableCards = new ArrayList<Card>();
 		
 		for(Card card : p.getCards()) {
-			if(isCardPlayable(p, card, playedCard, asAnswer)){
+			if(isCardPlayable(p, card, playedCard)){
 				playableCards.add(card);
 			}
 		}
 		
 		return playableCards;
 	}
+	
+	public boolean isCardPlayable(PlayerInGame p, Card card) {
+		PlayedCard lastCard = null;
+		
+		if(discardPile.size() > 0)
+			lastCard = discardPile.get(discardPile.size() - 1);
+		
+		return isCardPlayable(p, card, lastCard);
+	}
 
 	
-	public boolean isCardPlayable(PlayerInGame p, Card card, PlayedCard playedCard, boolean asAnswer) {		
+	public boolean isCardPlayable(PlayerInGame p, Card card, PlayedCard playedCard) {		
 		if(playedCard == null)
 			return true;
 		
@@ -252,22 +245,17 @@ public class Game {
 			return cardToTest.getColor() == null;
 		};
 		
-		if(asAnswer) {
-			return isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard);
+		if(playedCard.getTurn() != this.getTurn() || playedCard.getPlayer() != p) {
+			return (
+				sameColor.test(card, playedCard) || noColor.test(card) ||
+				(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
+				(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard))
+			);
 		}
-		else {
-			if(playedCard.getTurn() != this.getTurn() || playedCard.getPlayer() != p) {
-				return (
-					sameColor.test(card, playedCard) || noColor.test(card) ||
-					(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
-					(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard))
-				);
-			}
-			else return (
-					(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
-					(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard)) 
-				);
-		}
+		else return (
+			(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
+			(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard)) 
+		);
 	}
 	
 	/* SETTER/GETTER */
@@ -313,14 +301,6 @@ public class Game {
 		}
 	}
 	
-	public boolean removePlayer(Player p) {
-		return playersInGame.remove(p);
-	}
-	
-	public ArrayList<PlayedCard> getNormalPendingCards() {
-		return normalPendingCards;
-	}
-	
 	public boolean isDirectionLeft() {
 		return directionLeft;
 	}
@@ -353,20 +333,20 @@ public class Game {
 		return discardPile;
 	}
 	
-	public int getLastSkippedPlayerIndex() {
-		return lastSkippedPlayerIndex;
-	}
-
-	public void setLastSkippedPlayerIndex(int lastSkippedPlayerIndex) {
-		this.lastSkippedPlayerIndex = lastSkippedPlayerIndex;
-	}
-	
 	public boolean isStackSolved() {
 		return stackSolved;
 	}
 
 	public void setStackSolved(boolean stackSolved) {
 		this.stackSolved = stackSolved;
+	}
+	
+	public boolean isNextToSkip() {
+		return nextToSkip;
+	}
+
+	public void setNextToSkip(boolean nextToSkip) {
+		this.nextToSkip = nextToSkip;
 	}
 	
 	/*ELEMENTI PER DROOLS*/

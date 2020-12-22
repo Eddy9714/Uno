@@ -12,7 +12,7 @@ public class PlayerInGame{
 	private ROLE role;
 	private ArrayList<Card> cards = new ArrayList<Card>();
 	private boolean playerTurn = false;//decide il turno semaforo
-	private int blockCounters = 0; //stabilisce il numero di volte che un giocatore deve passare il turno
+	private boolean blocked = false; //stabilisce se il giocatore deve passare il suo turno
 	
 	private boolean hasDrawn = false;
 	private boolean hasPlayedCards = false;
@@ -71,14 +71,6 @@ public class PlayerInGame{
 			removeCard(card);
 	}
 
-	public int getBlockCounters() {
-		return blockCounters;
-	}
-
-	public void setBlockCounters(int blockCounters) {
-		this.blockCounters = blockCounters;
-	}
-
 	public boolean isUnoDeclared() {
 		return unoDeclared;
 	}
@@ -117,5 +109,13 @@ public class PlayerInGame{
 
 	public void setFirst(boolean isFirst) {
 		this.isFirst = isFirst;
+	}
+
+	public boolean isBlocked() {
+		return blocked;
+	}
+
+	public void setBlocked(boolean blocked) {
+		this.blocked = blocked;
 	}
 }

@@ -126,8 +126,7 @@ rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to next player"
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.TURN_END,
-			$players: playersInGame,
-			$normalPendingCards : normalPendingCards
+			$players: playersInGame
 		);
 		$player : PlayerInGame(playerTurn == true) from $players;
 	then		
@@ -140,9 +139,11 @@ rule "GAME PLAY, TURN_END, no more rapid effects. Pass turn to next player"
 		System.out.println("Il turno di " + $player.getPlayer().getName() + " è terminato");
 		System.out.println();
 		
+		if($player.isBlocked()){
+			$player.setBlocked(false);
+		}
+		
 		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_START);
-		if($normalPendingCards.size() > 0)
-			$g.setStackSolved(false);
 			
 		update($g);
 		
@@ -161,32 +162,56 @@ rule "GAME PLAY, TURN_START"
 		
 		if($player.isFirst())
 			$g.setTurn($g.getTurn() + 1);
-		
-		if($player.getBlockCounters() > 0){
-			System.out.println($player.getPlayer().getName() + " è bloccato " + $player.getBlockCounters() + " turni");
-			$player.setBlockCounters($player.getBlockCounters() - 1);
-			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-		}
-		else {
-		
-			System.out.println("-----------------------------------------------------------------------");
-			System.out.println("Turno " + $g.getTurn());
-			System.out.println("Ultima carta giocata: " + $g.getDiscardPile().get($g.getDiscardPile().size() - 1).getCard());
-			System.out.println();
-			System.out.println("E' il turno di " + $player.getPlayer().getName());
 			
-			if($player.getCards().size() == 0 && $player.isUnoDeclared()){
-				System.out.println($player.getPlayer().getName() + " ha vinto!");
-				$g.setStatus(Game.GAME_STATUS.END);
-			}
-			
-			$g.setLastSkippedPlayerIndex(-1);
-			$player.setHasDrawn(false);
-			$player.setHasPlayedCards(false);
-			$player.setHasCharged(false);
-			$g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+		System.out.println("-----------------------------------------------------------------------");
+		System.out.println("Turno " + $g.getTurn());
+		System.out.println("Ultima carta giocata: " + $g.getDiscardPile().get($g.getDiscardPile().size() - 1).getCard());
+		System.out.println();
+		System.out.println("E' il turno di " + $player.getPlayer().getName());			
+		$player.setHasDrawn(false);
+		$player.setHasPlayedCards(false);
+		$player.setHasCharged(false);
+		
+		$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);
+		
+		if($player.isBlocked()){
+			System.out.println($player.getPlayer().getName() + " non può giocare per questo turno");
 		}
 		
+		update($g);
+end
+
+rule "Player wins if he has no cards remaining and no one notices that he hasn't declared UNO before"
+	salience 9999
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.TURN_START,
+			$players: playersInGame
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+		eval($player.isUnoDeclared() == false);
+		eval($player.getCards().size() == 0);
+		eval(!$player.isBlocked());
+	then
+		System.out.println($player.getPlayer().getName() + " ha vinto!");
+		$g.setStatus(Game.GAME_STATUS.END);
+		update($g);
+end
+
+rule "Player wins if he has no cards remaining and he has declared UNO before"
+	salience 9999
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			$players: playersInGame
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+		eval($player.isUnoDeclared() == true);
+		eval($player.getCards().size() == 0);
+	then
+		System.out.println($player.getPlayer().getName() + " ha vinto!");
+		$g.setStatus(Game.GAME_STATUS.END);
 		update($g);
 end
 
@@ -215,166 +240,10 @@ rule "GAME END"
 		);
 		$player : PlayerInGame(playerTurn == true) from $players;
 		eval($player.getCards().size() == 0 && $player.isUnoDeclared());
-		eval($player.getBlockCounters() == 0);
+		eval(!$player.isBlocked());
 	then
 		System.out.println($player.getPlayer().getName() + " ha vinto!");
 		$g.setStatus(Game.GAME_STATUS.END);
-		update($g);
-end
-
-rule "GAME PLAY, PLAY CARDS. Player has to respond to slow card effects. If he is not able to respond, cards effect need to be evaluated"
-	when
-		$g : Game(
-			status == Game.GAME_STATUS.PLAY,
-			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
-			$players: playersInGame,
-			$discardPile : discardPile,
-			$normalPendingCards : normalPendingCards,
-			$normalPendingCards.size() > 0,
-			stackSolved == false
-		);
-		$player : PlayerInGame(playerTurn == true) from $players;
-	then
-		
-		System.out.println("Le seguenti carte devono eseguire il loro effetto: ");
-		$g.printActionStack();
-		
-		PlayedCard lastStackedCardObj = ((ArrayList<PlayedCard>)($normalPendingCards)).get($normalPendingCards.size() - 1);
-		ActionCard lastStackedCard = (ActionCard)lastStackedCardObj.getCard();
-		
-		System.out.println();
-		System.out.println($player.getPlayer().getName() + " deve decidere che cosa fare:");
-		ArrayList<Option> options = new ArrayList<Option>();
-		Scanner in = new Scanner(System.in);
-		int num = -1;
-		
-		if(lastStackedCard.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
-			
-			$normalPendingCards.remove($normalPendingCards.size() - 1);
-		
-			options.add(new Option(Option.TYPE.CHOICE_YES, null, "1 - Pesca le carte"));
-			options.add(new Option(Option.TYPE.CHOICE_NO, null, "2 - Accusa giocatore"));
-			
-			for(Option option : options){
-				System.out.println(option.getMessage());
-			}
-			
-			do {
-				num = in.nextInt();
-				
-				if(num < 1 || num > options.size()){
-					System.out.println("Scegli un'opzione valida!");
-					System.out.println();
-				}
-				else {
-					Option opt = options.get(num - 1);
-					
-					if(opt.getType() == Option.TYPE.CHOICE_YES){
-						ArrayList<Card> cards = $g.dealCardsToPlayer($player, 4);
-						System.out.println($player.getPlayer().getName() + " ha pescato: ");
-						$g.printCardsList(cards);						
-					}
-					else {
-						System.out.println($player.getPlayer().getName() + " ha accusato " + lastStackedCardObj.getPlayer().getPlayer().getName());
-						System.out.println(lastStackedCardObj.getPlayer().getPlayer().getName() + " ha la seguente mano:");
-						$g.printCardsList(lastStackedCardObj.getPlayer().getCards());
-						
-						ArrayList<Card> cards = $g.getPlayableCards(lastStackedCardObj.getPlayer(), $g.getDiscardPile().get($g.getDiscardPile().size() - 2), false);
-						
-						// WILD_DRAW_FOUR non è considerata una carta giocabile in alternativa ad una WILD_DRAW_FOUR
-						for(Card c : cards){
-							if(c.getType() == Card.CARD_TYPE.ACTION)
-							{
-								ActionCard ac = (ActionCard)c;
-								if(ac.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
-									cards.remove(c);
-								}
-							} 
-						}
-						
-						if(cards.size() > 0){
-							System.out.println($player.getPlayer().getName() + " ha indovinato!");
-							System.out.println(lastStackedCardObj.getPlayer().getPlayer().getName() + " poteva giocare: ");
-							$g.printCardsList(cards);
-							System.out.println(lastStackedCardObj.getPlayer().getPlayer().getName() + " deve pescare 4 carte");
-							ArrayList<Card> drawnCards = $g.dealCardsToPlayer(lastStackedCardObj.getPlayer(), 4);
-							System.out.println(lastStackedCardObj.getPlayer().getPlayer().getName() + " ha pescato: ");
-							$g.printCardsList(drawnCards);
-						}
-						else {
-							System.out.println($player.getPlayer().getName() + " ha sbagliato!");
-							System.out.println($player.getPlayer().getName() + " deve pescare 6 carte");
-							ArrayList<Card> drawnCards = $g.dealCardsToPlayer($player, 6);
-							System.out.println($player.getPlayer().getName() + " ha pescato: ");
-							$g.printCardsList(drawnCards);
-						}
-					}
-				}
-			}
-			while(num < 1 || num > options.size());	
-		}
-		else {
-			ArrayList<Card> playableCards = $g.getPlayableCards($player, true);
-			
-			if(playableCards.size() == 0){
-				options.add(new Option(Option.TYPE.DRAW, null, "1 - Pesca"));
-			}
-			else {
-				for(int k=0; k<playableCards.size();k++){
-					options.add(new Option(Option.TYPE.CARD_CHOICE, playableCards.get(k), (k+1) + " - " + "Gioca " + playableCards.get(k)));
-				}
-			}
-			
-			for(Option option : options){
-				System.out.println(option.getMessage());
-			}
-			
-			do {
-				num = in.nextInt();
-				
-				if(num < 1 || num > options.size()){
-					System.out.println("Scegli un'opzione valida!");
-					System.out.println();
-				}
-				else {
-					Option opt = options.get(num - 1);
-					
-					if(opt.getType() == Option.TYPE.CARD_CHOICE){
-						$g.setCardToEvaluate(new PlayedCard($player, $player.getCards().indexOf(playableCards.get(num - 1)), $g.getTurn()));
-						$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_CARD);
-		
-						System.out.println($player.getPlayer().getName() + " ha giocato: " + playableCards.get(num - 1));
-						$player.setHasPlayedCards(true);
-					}
-					else if(opt.getType() == Option.TYPE.DRAW){
-					
-						for(int k=0;k<$normalPendingCards.size(); k++){
-							System.out.println($player.getPlayer().getName() + " deve pescare 2 carte");
-							ArrayList<Card> drawnCards = $g.dealCardsToPlayer($player, 2);
-							System.out.println($player.getPlayer().getName() + " ha pescato: ");
-							$g.printCardsList(drawnCards);
-						}
-						
-						$normalPendingCards.clear();
-					}
-				}
-			}
-			while(num < 1 || num > options.size());	
-		}
-		$g.setStackSolved(true);
-		update($g);
-end
-
-rule "GAME PLAY, STACK SOLVED"
-	when
-		$g : Game(
-			status == Game.GAME_STATUS.PLAY,
-			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
-			normalPendingCards.size() == 0,
-			stackSolved == false
-		);
-	then
-		$g.setStackSolved(true);
 		update($g);
 end
 
@@ -382,10 +251,8 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 	when
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
-			phaseStatus == Game.PHASE_STATUS.PLAY_CARDS,
-			$players: playersInGame,
-			$normalPendingCards : normalPendingCards,
-			stackSolved == true
+			phaseStatus == Game.PHASE_STATUS.MAIN,
+			$players: playersInGame
 		);
 		$player : PlayerInGame(playerTurn == true) from $players;
 	then
@@ -393,35 +260,26 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 		System.out.println($player.getPlayer().getName() + " ha la seguente mano:");
 		$g.printCardsList($player.getCards());
 		
-		
-		
-		if($player.getCards().size() == 1 && $player.getCards().get(0).getType() == Card.CARD_TYPE.ACTION){
-			System.out.println($player.getPlayer().getName() + " non può concludere con una carta speciale, quindi pesca 1 carta.");
-			ArrayList<Card> drawnCards = $g.dealCardsToPlayer($player, 1);
-			System.out.println($player.getPlayer().getName() + " ha pescato: ");
-			$g.printCardsList(drawnCards);
-			System.out.println($player.getPlayer().getName() + " ha la seguente mano:");
-			$g.printCardsList($player.getCards());
-		}
-		
-		ArrayList<Card> playableCards = $g.getPlayableCards($player, false);
+		ArrayList<Card> playableCards = $g.getPlayableCards($player);
 		System.out.println();
 		System.out.println($player.getPlayer().getName() + " deve decidere che cosa fare:");
 		
 		ArrayList<Option> options = new ArrayList<Option>();
 		
-		for(int k=0; k<playableCards.size();k++){
-			options.add(new Option(Option.TYPE.CARD_CHOICE, playableCards.get(k), (k+1) + " - " + "Gioca " + playableCards.get(k)));
+		if(!$player.hasPlayedCards() && !$player.isBlocked()){
+			for(int k=0; k<playableCards.size();k++){
+				options.add(new Option(Option.TYPE.CARD_CHOICE, playableCards.get(k), (k+1) + " - " + "Gioca " + playableCards.get(k)));
+			}	
 		}
 		
-		if($player.hasPlayedCards() || $player.hasDrawn()){
+		if($player.hasPlayedCards() || $player.hasDrawn() || $player.isBlocked()){
 			options.add(new Option(Option.TYPE.PASS_TURN, null, (options.size() + 1) + " - Passa il turno"));
 		}
-		if(!$player.hasDrawn() && !$player.hasPlayedCards()){
+		if(!$player.hasDrawn() && !$player.hasPlayedCards() && !$player.isBlocked()){
 			options.add(new Option(Option.TYPE.DRAW, null, (options.size() + 1) + " - Pesca"));
 		}
 		
-		if(!$player.isUnoDeclared())
+		if(!$player.isUnoDeclared() && !$player.isBlocked())
 			options.add(new Option(Option.TYPE.DECLARE_UNO, null, (options.size() + 1) + " - Dichiara UNO"));
 		
 		if(!$player.hasPlayedCards() && !$player.hasCharged())
@@ -458,7 +316,19 @@ rule "GAME PLAY, PLAY CARDS. Cards effect evaluated (if any). Now player may pla
 				else if(opt.getType() == Option.TYPE.DRAW){
 					Card card = $g.dealCardToPlayer($player);
 					System.out.println($player.getPlayer().getName() + " ha pescato: " + card);
+					
+					if($g.isCardPlayable($player, card)){
+						$g.setCardToEvaluate(new PlayedCard($player, $player.getCards().indexOf(card), $g.getTurn()));
+						System.out.println($player.getPlayer().getName() + " ha giocato: " + card);
+						$player.setHasPlayedCards(true);
+						$g.setPhaseStatus(Game.PHASE_STATUS.EVAL_CARD);
+					}
+					else {
+						System.out.println($player.getPlayer().getName() + " non può giocare: " + card);
+					}
+					
 					$player.setHasDrawn(true);
+
 				}
 				else if(opt.getType() == Option.TYPE.CHARGE_UNO_MISSED){
 					
@@ -557,12 +427,14 @@ rule "EVAL RAPID ACTION CARD REVERSE"
 		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) {
 			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_START);
 		}
-		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
-		
+		else {
+			$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);
+			$g.setNextToSkip(true);
+		}
 		update($g);
 end
 
-rule "EVAL RAPID ACTION CARD, SKIP"
+rule "SKIP"
 	when
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
@@ -578,36 +450,26 @@ rule "EVAL RAPID ACTION CARD, SKIP"
 		);
 		$player : PlayerInGame(playerTurn == true) from $players;
 	then
-		int index = $g.getLastSkippedPlayerIndex();
+	
 		int epsilon = $g.isDirectionLeft() ? -1 : 1;
-		
-		int nextSkippedPlayerIndex = Math.floorMod((index == -1 ? $players.indexOf($cardToEvaluate.getPlayer()) + epsilon : index + epsilon), $players.size());
-				
+		int nextSkippedPlayerIndex = Math.floorMod($players.indexOf($cardToEvaluate.getPlayer()) + epsilon, $players.size());			
 		PlayerInGame nextPlayerToSkip = (PlayerInGame)($players.get(nextSkippedPlayerIndex));
-		
-		//Stesso giocatore
-		if(nextPlayerToSkip.equals($player))
-		{
-			nextSkippedPlayerIndex = Math.floorMod(nextSkippedPlayerIndex + epsilon, $players.size());
-			nextPlayerToSkip = (PlayerInGame)($players.get(nextSkippedPlayerIndex));
-		}
-		
-		nextPlayerToSkip.setBlockCounters(nextPlayerToSkip.getBlockCounters() + 1);
-		System.out.println(nextPlayerToSkip.getPlayer().getName() + " dovrà saltare " + nextPlayerToSkip.getBlockCounters() + " turni");
-		
-		$g.setLastSkippedPlayerIndex(nextSkippedPlayerIndex);	
+		nextPlayerToSkip.setBlocked(true);
+		System.out.println(nextPlayerToSkip.getPlayer().getName() + " dovrà saltare il turno");
 		
 		$discardPile.add($cardToEvaluate);
 		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
 		$g.setCardToEvaluate(null);
+		$g.setNextToSkip(true);
 		
-		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) $g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
-		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD)
+			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		else
+			$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);
 		update($g);	
 end
 
-rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
+rule "WILD OR WILD_DRAW_FOUR-COLOR_NOT_CHOSEN EVAL_CARD"
 	when
 		$g : Game(
 			status == Game.GAME_STATUS.PLAY,
@@ -615,13 +477,13 @@ rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 			$discardPile : discardPile,
 			$cardToEvaluate : cardToEvaluate,
 			$cardToEvaluate != null,
-			$normalPendingCards : normalPendingCards,
 			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
-			$card.getActionType() == ActionCard.ACTION_TYPE.WILD || $card.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR
-		);
+			$card.getActionType() == ActionCard.ACTION_TYPE.WILD || (
+				$card.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR && $card.getColor() == null
+			)
+		); 
 	then
-	
 		System.out.println($cardToEvaluate.getPlayer().getPlayer().getName() + " deve scegliere un colore:");
 		ArrayList<Option> options = new ArrayList<Option>();
 		
@@ -654,14 +516,106 @@ rule "EVAL RAPID ACTION CARD, WILD OR DRAW_4"
 		$discardPile.add($cardToEvaluate);
 		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
 		
-		$g.setCardToEvaluate(null);
-		
-		if($card.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
-			$normalPendingCards.add($cardToEvaluate);
-			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		if($card.getActionType() != ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
+			$g.setCardToEvaluate(null);
+			$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);
 		}
-		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
+				
+		update($g);
+end
+
+rule "WILD_DRAW_FOUR, COLOR CHOOSEN"
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			phaseStatus == Game.PHASE_STATUS.EVAL_CARD,
+			$discardPile : discardPile,
+			$players : playersInGame,
+			$cardToEvaluate : cardToEvaluate,
+			$cardToEvaluate != null,
+			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
+			$card : ((ActionCard)cardToEvaluate.getCard()),
+			$card.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR,
+			$card.getColor() != null
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then
 		
+		int currentPlayerPosition = $players.indexOf($cardToEvaluate.getPlayer());
+		int nextPosition = Math.floorMod(currentPlayerPosition + ($g.isDirectionLeft() ? -1 : 1), $players.size());
+		
+		PlayerInGame nextPlayer = (PlayerInGame)($players.get(nextPosition));
+		System.out.println("Il giocatore " + nextPlayer.getPlayer().getName() + " deve decidere cosa fare.");
+		
+		ArrayList<Option> options = new ArrayList<Option>();
+		Scanner in = new Scanner(System.in);
+		int num = -1;
+		
+		options.add(new Option(Option.TYPE.CHOICE_YES, null, "1 - Pesca le carte"));
+		options.add(new Option(Option.TYPE.CHOICE_NO, null, "2 - Accusa giocatore"));
+		
+		for(Option option : options){
+			System.out.println(option.getMessage());
+		}
+		
+		do {
+			num = in.nextInt();
+			
+			if(num < 1 || num > options.size()){
+				System.out.println("Scegli un'opzione valida!");
+				System.out.println();
+			}
+			else {
+				Option opt = options.get(num - 1);
+				
+				if(opt.getType() == Option.TYPE.CHOICE_YES){
+					ArrayList<Card> cards = $g.dealCardsToPlayer($player, 4);
+					System.out.println($player.getPlayer().getName() + " ha pescato: ");
+					$g.printCardsList(cards);						
+				}
+				else {
+					System.out.println(nextPlayer.getPlayer().getName() + " ha accusato " + $player.getPlayer().getName());
+					System.out.println($player.getPlayer().getName() + " ha la seguente mano:");
+					$g.printCardsList($player.getCards());
+					
+					ArrayList<Card> cards = $g.getPlayableCards($player, $g.getDiscardPile().get($g.getDiscardPile().size() - 2));
+					
+					// WILD_DRAW_FOUR non è considerata una carta giocabile in alternativa ad una WILD_DRAW_FOUR
+					for(Card c : cards){
+						if(c.getType() == Card.CARD_TYPE.ACTION)
+						{
+							ActionCard ac = (ActionCard)c;
+							if(ac.getActionType() == ActionCard.ACTION_TYPE.WILD_DRAW_FOUR){
+								cards.remove(c);
+							}
+						} 
+					}
+					
+					if(cards.size() > 0){
+						System.out.println(nextPlayer.getPlayer().getName() + " ha indovinato!");
+						System.out.println(nextPlayer.getPlayer().getName() + " poteva giocare: ");
+						$g.printCardsList(cards);
+						System.out.println($player.getPlayer().getName() + " deve pescare 4 carte");
+						ArrayList<Card> drawnCards = $g.dealCardsToPlayer($player, 4);
+						System.out.println($player.getPlayer().getName() + " ha pescato: ");
+						$g.printCardsList(drawnCards);
+					}
+					else {
+						System.out.println(nextPlayer.getPlayer().getName() + " ha sbagliato!");
+						System.out.println(nextPlayer.getPlayer().getName() + " deve pescare 6 carte");
+						ArrayList<Card> drawnCards = $g.dealCardsToPlayer(nextPlayer, 6);
+						System.out.println(nextPlayer.getPlayer().getName() + " ha pescato: ");
+						$g.printCardsList(drawnCards);
+					}
+				}
+			}
+		}
+		while(num < 1 || num > options.size());
+	
+		$g.setNextToSkip(true);
+		$g.setCardToEvaluate(null);
+		$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);
+			
 		update($g);
 end
 
@@ -678,9 +632,10 @@ rule "FIRST TURN, WILD CARD"
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.WILD
 		);
+		$player : PlayerInGame(playerTurn == true) from $players;
 	then
 	
-		int currentPlayerPosition = $players.indexOf($cardToEvaluate.getPlayer());
+		int currentPlayerPosition = $players.indexOf($player);
 		int nextPosition = Math.floorMod(currentPlayerPosition + ($g.isDirectionLeft() ? -1 : 1), $players.size());
 		
 		PlayerInGame playerInGame = (PlayerInGame)($players.get(nextPosition));
@@ -719,6 +674,7 @@ rule "FIRST TURN, WILD CARD"
 		$g.setCardToEvaluate(null);
 		
 		$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+
 		update($g);
 end
 
@@ -728,23 +684,38 @@ rule "DRAW_TWO"
 			status == Game.GAME_STATUS.PLAY,
 			phaseStatus == Game.PHASE_STATUS.EVAL_CARD || phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD,
 			$phaseStatus : phaseStatus,
-			$discardPile: discardPile,
+			$discardPile : discardPile,
+			$players : playersInGame,
 			$cardToEvaluate : cardToEvaluate,
 			$cardToEvaluate != null,
-			$normalPendingCards: normalPendingCards,
 			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.ACTION,
 			$card : ((ActionCard)cardToEvaluate.getCard()),
 			$card.getActionType() == ActionCard.ACTION_TYPE.DRAW_TWO
 		);
-	then
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then		
+		int epsilon = $g.isDirectionLeft() ? -1 : 1;
+		int nextSkippedPlayerIndex = Math.floorMod($players.indexOf($player) + epsilon, $players.size());	
+				
+		PlayerInGame nextPlayerToSkip = (PlayerInGame)($players.get(nextSkippedPlayerIndex));
+		System.out.println("Il giocatore " + nextPlayerToSkip.getPlayer().getName() + " deve pescare due carte e salta il turno");
+		
+		ArrayList<Card> drawnCards = $g.dealCardsToPlayer(nextPlayerToSkip, 2);
+		System.out.println(nextPlayerToSkip.getPlayer().getName() + " ha pescato: ");
+		$g.printCardsList(drawnCards);
+		
 		$discardPile.add($cardToEvaluate);
-		$normalPendingCards.add($cardToEvaluate);
 		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
+		
+		$g.setNextToSkip(true);
+		
 		$g.setCardToEvaluate(null);
 		
-		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) $g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
-		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD)
+			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		else
+			$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);	
+			
 		update($g);
 end
 
@@ -757,7 +728,6 @@ rule "NORMAL CARD"
 			$discardPile: discardPile,
 			$cardToEvaluate : cardToEvaluate,
 			$cardToEvaluate != null,
-			$normalPendingCards: normalPendingCards,
 			cardToEvaluate.getCard().getType() == Card.CARD_TYPE.NORMAL
 		);
 	then
@@ -765,8 +735,45 @@ rule "NORMAL CARD"
 		$cardToEvaluate.getPlayer().removeCard($cardToEvaluate.getCard());
 		$g.setCardToEvaluate(null);
 		
-		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD) $g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
-		else $g.setPhaseStatus(Game.PHASE_STATUS.PLAY_CARDS);
-		
+		if($phaseStatus == Game.PHASE_STATUS.EVAL_FIRST_CARD)
+			$g.setPhaseStatus(Game.PHASE_STATUS.TURN_END);
+		else
+			$g.setPhaseStatus(Game.PHASE_STATUS.MAIN);
 		update($g);
+end
+
+
+rule "Player designed has to skip the turn"
+	salience 9999
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			$players: playersInGame,
+			nextToSkip == true
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+	then
+		int epsilon = $g.isDirectionLeft() ? -1 : 1;
+		int nextSkippedPlayerIndex = Math.floorMod($players.indexOf($player) + epsilon, $players.size());			
+		PlayerInGame nextPlayerToSkip = (PlayerInGame)($players.get(nextSkippedPlayerIndex));
+		nextPlayerToSkip.setBlocked(true);
+		$g.setNextToSkip(false);
+		update($g);
+end
+
+rule "Player that remains with one card and this one is special, has to draw one card"
+	salience 9999
+	when
+		$g : Game(
+			status == Game.GAME_STATUS.PLAY,
+			$players: playersInGame
+		);
+		$player : PlayerInGame(playerTurn == true) from $players;
+		eval($player.getCards().size() == 1);
+		eval($player.getCards().get($player.getCards().size() - 1).getType() == Card.CARD_TYPE.ACTION);
+	then
+		System.out.println($player.getPlayer().getName() + " non può concludere con una carta speciale, quindi pesca 1 carta.");
+		ArrayList<Card> drawnCards = $g.dealCardsToPlayer($player, 1);
+		System.out.println($player.getPlayer().getName() + " ha pescato: ");
+		$g.printCardsList(drawnCards);
 end
