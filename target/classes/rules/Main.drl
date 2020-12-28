@@ -2,7 +2,6 @@ package com.sample
 import com.sample.Game;
 import java.util.ArrayList;
 import com.sample.Players.PlayerInGame;
-import com.sample.Utils.PlayerCards;
 import com.sample.Utils.Option;
 import com.sample.Cards.Card;
 import com.sample.Cards.PlayedCard;
@@ -64,10 +63,21 @@ rule "Game BEGIN, the dealer deals 7 cards to each player."
 		System.out.println("Il dealer distribuisce " + Game.CARDS_TO_DEAL + " carte a ciascun giocatore in senso orario");
 		
 		System.out.println();
-		ArrayList<PlayerCards> playersCards = $g.dealCardsToPlayers($dealer, Game.CARDS_TO_DEAL);
-		for(PlayerCards playerCard : playersCards){
-			System.out.println(playerCard.getPlayer().getPlayer().getName() + " ha ricevuto le seguenti carte:");
-			$g.printCardsList(playerCard.getCards());
+		
+		int index = $players.indexOf($dealer);
+		
+		for(int k = index - 1; k >= 0; k--) {
+			PlayerInGame p = (PlayerInGame) $players.get(k);
+			$g.dealCardsToPlayer(p, Game.CARDS_TO_DEAL);
+			System.out.println(p.getPlayer().getName() + " ha ricevuto le seguenti carte:");
+			$g.printCardsList(p.getCards());
+		}
+		
+		for(int k =  $players.size() - 1; k >= index; k--) {
+			PlayerInGame p = (PlayerInGame) $players.get(k);
+			$g.dealCardsToPlayer(p, Game.CARDS_TO_DEAL);
+			System.out.println(p.getPlayer().getName() + " ha ricevuto le seguenti carte:");
+			$g.printCardsList(p.getCards());
 		}
 		
 		$g.setPhaseStatus(Game.PHASE_STATUS.FIRST_CARD);

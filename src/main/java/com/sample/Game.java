@@ -12,7 +12,6 @@ import com.sample.Players.Player;
 import com.sample.Players.PlayerInGame;
 import com.sample.Utils.CardTest;
 import com.sample.Utils.CardsTest;
-import com.sample.Utils.PlayerCards;
 
 public class Game {
 	
@@ -30,6 +29,7 @@ public class Game {
 	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
+	private boolean nextToSkip = false;
 	
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
 
@@ -117,24 +117,6 @@ public class Game {
 	
 	public void shufflePile() {
 		Collections.shuffle(pile);
-	}
-	
-	public ArrayList<PlayerCards> dealCardsToPlayers(PlayerInGame dealer, int number) {
-		int index = playersInGame.indexOf(dealer);
-		
-		ArrayList<PlayerCards> list = new ArrayList<PlayerCards>(playersInGame.size());
-		
-		for(int k = index - 1; k >= 0; k--) {
-			ArrayList<Card> cards = dealCardsToPlayer(playersInGame.get(k), number);
-			list.add(new PlayerCards(playersInGame.get(k), cards));
-		}
-		
-		for(int k = playersInGame.size() - 1; k >= index; k--) {
-			ArrayList<Card> cards = dealCardsToPlayer(playersInGame.get(k), number);
-			list.add(new PlayerCards(playersInGame.get(k), cards));
-		}
-		
-		return list;
 	}
 	
 	public Card dealCardToPlayer(PlayerInGame p) {
@@ -326,6 +308,14 @@ public class Game {
 	
 	public ArrayList<PlayedCard> getDiscardPile() {
 		return discardPile;
+	}
+	
+	public boolean isNextToSkip() {
+		return nextToSkip;
+	}
+
+	public void setNextToSkip(boolean nextToSkip) {
+		this.nextToSkip = nextToSkip;
 	}
 	
 	/*ELEMENTI PER DROOLS*/
