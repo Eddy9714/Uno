@@ -12,27 +12,18 @@ import java.util.Scanner;
 
 import java.util.ArrayList;
 
-rule "GAME INIT"
-	when 
-		$g : Game(
-			status == Game.GAME_STATUS.INIT
-		)
-	then
-		System.out.println("Benvenuti nel gioco UNO!");
-		System.out.println("La partita è stata creata con successo");
-		$g.setStatus(Game.GAME_STATUS.READY);
-		update($g);
-end
-
-rule "Game READY, create pile, select dealer"
+rule "Game INIT, create pile, select dealer"
     when
 		$g : Game(
-			status == Game.GAME_STATUS.READY,
+			status == Game.GAME_STATUS.INIT,
 			$players : playersInGame
 		)
 		eval($players.size() >= 2 && $players.size() <= $g.MAX_PLAYERS);
     then
     
+    	System.out.println("Benvenuti nel gioco UNO!");
+		System.out.println("La partita è stata creata con successo");
+    	
     	ArrayList<PlayerInGame> players = ((ArrayList<PlayerInGame>)$players);
     	
     	System.out.println("Giocatori trovati: " + players.size());

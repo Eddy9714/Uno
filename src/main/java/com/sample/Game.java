@@ -19,8 +19,8 @@ public class Game {
 	public final int MAX_PLAYERS;
 	public static final int CARDS_TO_DEAL = 7;
 	
-	public static enum GAME_STATUS {INIT, READY, BEGIN, PLAY, END};
-	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, ANSWER, EVAL_CARD, MAIN, TURN_START, TURN_END};
+	public static enum GAME_STATUS {INIT, BEGIN, PLAY, END};
+	public static enum PHASE_STATUS {DEAL_CARDS, FIRST_CARD, EVAL_FIRST_CARD, EVAL_CARD, MAIN, TURN_START, TURN_END};
 	
 	private String id;
 	private int turn = 0;
@@ -30,25 +30,21 @@ public class Game {
 	private boolean directionLeft = true;
 	
 	private final ArrayList<PlayerInGame> playersInGame = new ArrayList<PlayerInGame>();
-	private boolean nextToSkip = false;
 	
 	private final ArrayList<Card> pile = new ArrayList<Card>();//mazzo
 
 	private final ArrayList<PlayedCard> discardPile = new ArrayList<PlayedCard>();//scarti
 	
 	private PlayedCard cardToEvaluate = null;
-	private boolean stackSolved = false;
 	
 	/*COSTRUTTORI*/
 	
 	public Game(int maxPlayers) {
-		assert(maxPlayers >= 2);
 		this.MAX_PLAYERS = maxPlayers;
 		id = UUID.randomUUID().toString();
 	}
 	
 	public Game(int maxPlayers, ArrayList<Player> players) {
-		assert(maxPlayers >= 2);
 		this.MAX_PLAYERS = maxPlayers;
 		
 		id = UUID.randomUUID().toString();
@@ -59,7 +55,6 @@ public class Game {
 	}
 	
 	public Game(int maxPlayers, Player... players) {
-		assert(maxPlayers >= 2);
 		this.MAX_PLAYERS = maxPlayers;
 		
 		id = UUID.randomUUID().toString();
@@ -127,8 +122,6 @@ public class Game {
 	public ArrayList<PlayerCards> dealCardsToPlayers(PlayerInGame dealer, int number) {
 		int index = playersInGame.indexOf(dealer);
 		
-		assert(index != -1);
-		
 		ArrayList<PlayerCards> list = new ArrayList<PlayerCards>(playersInGame.size());
 		
 		for(int k = index - 1; k >= 0; k--) {
@@ -149,7 +142,6 @@ public class Game {
 	}
 	
 	public ArrayList<Card> dealCardsToPlayer(PlayerInGame p, int number) {
-		assert(number >= 0);
 		
 		ArrayList<Card> cards = new ArrayList<Card>(number);
 		for(int k=0;k<number;k++) {
@@ -158,7 +150,9 @@ public class Game {
 				cards.add(card);
 			}
 			else {
-				assert(discardPile.size() >= number - k);
+				System.out.println(pile.size());
+				System.out.println(discardPile.size());
+				
 				PlayedCard topCard = discardPile.remove(discardPile.size() - 1);
 				for(PlayedCard cardPlayed : discardPile){
 					pile.add(cardPlayed.getCard());
@@ -231,16 +225,10 @@ public class Game {
 		};
 		
 		CardsTest sameActionCard = (cardToTest, lastPlayedCard) -> {
-			assert(isActionCard.test(cardToTest));
-			assert(isActionCard.test(lastPlayedCard.getCard()));
-			
 			return ((ActionCard)cardToTest).getActionType() == ((ActionCard)(lastPlayedCard.getCard())).getActionType();
 		};
 		
-		CardsTest sameNumber = (cardToTest, lastPlayedCard) -> {
-			assert(isNormalCard.test(cardToTest));
-			assert(isNormalCard.test(lastPlayedCard.getCard()));
-			
+		CardsTest sameNumber = (cardToTest, lastPlayedCard) -> {			
 			return ((NormalCard)cardToTest).getNumber() == ((NormalCard)(lastPlayedCard.getCard())).getNumber();
 		};
 		
@@ -338,22 +326,6 @@ public class Game {
 	
 	public ArrayList<PlayedCard> getDiscardPile() {
 		return discardPile;
-	}
-	
-	public boolean isStackSolved() {
-		return stackSolved;
-	}
-
-	public void setStackSolved(boolean stackSolved) {
-		this.stackSolved = stackSolved;
-	}
-	
-	public boolean isNextToSkip() {
-		return nextToSkip;
-	}
-
-	public void setNextToSkip(boolean nextToSkip) {
-		this.nextToSkip = nextToSkip;
 	}
 	
 	/*ELEMENTI PER DROOLS*/
