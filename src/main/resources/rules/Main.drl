@@ -171,7 +171,7 @@ rule "2.1.2 PLAY, TURN_START. Player wins if he can play his turn, has no remain
 		update($g);
 end
 
-rule "2.1.3 PLAY, TURN_START. Game ends if player can play his turn, has no remaining cards and has declered UNO before. (max priority)"
+rule "2.1.3 PLAY. Game ends if player has no remaining cards and has declared UNO before. (max priority)"
 	salience 9999
 	when
 		$g : Game(
@@ -181,7 +181,6 @@ rule "2.1.3 PLAY, TURN_START. Game ends if player can play his turn, has no rema
 		$player : PlayerInGame(playerTurn == true) from $players;
 		eval($player.isUnoDeclared() == true);
 		eval($player.getCards().size() == 0);
-		eval(!$player.isBlocked());
 	then
 		System.out.println($player.getPlayer().getName() + " ha vinto!");
 		$g.setStatus(Game.GAME_STATUS.END);
