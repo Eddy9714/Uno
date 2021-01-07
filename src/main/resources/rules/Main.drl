@@ -215,6 +215,7 @@ rule "2.2 PLAY, MAIN. Player can play his turn. (Set of actions available)"
 		if($player.hasPlayedCards() || $player.hasDrawn() || $player.isBlocked()){
 			options.add(new Option(Option.TYPE.PASS_TURN, null, (options.size() + 1) + " - Passa il turno"));
 		}
+		
 		if(!$player.hasDrawn() && !$player.hasPlayedCards() && !$player.isBlocked()){
 			options.add(new Option(Option.TYPE.DRAW, null, (options.size() + 1) + " - Pesca"));
 		}
@@ -222,7 +223,7 @@ rule "2.2 PLAY, MAIN. Player can play his turn. (Set of actions available)"
 		if(!$player.isUnoDeclared() && !$player.isBlocked())
 			options.add(new Option(Option.TYPE.DECLARE_UNO, null, (options.size() + 1) + " - Dichiara UNO"));
 		
-		if(!$player.hasPlayedCards() && !$player.hasCharged())
+		if(!$player.hasPlayedCards())
 			options.add(new Option(Option.TYPE.CHARGE_UNO_MISSED, null, (options.size() + 1) + " - UNO non dichiarato"));
 		
 		for(Option option : options){

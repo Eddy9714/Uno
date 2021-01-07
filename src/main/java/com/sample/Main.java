@@ -10,6 +10,7 @@ import org.kie.api.runtime.KieSession;
 import com.sample.Players.Player;
 
 public class Main {
+	
 	public static void main(String[] args) {
 		KieServices ks = KieServices.Factory.get();
 		KieContainer kContainer = ks.getKieClasspathContainer();

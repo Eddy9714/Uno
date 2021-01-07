@@ -222,16 +222,10 @@ public class Game {
 			return cardToTest.getColor() == null;
 		};
 		
-		if(playedCard.getTurn() != this.getTurn() || playedCard.getPlayer() != p) {
-			return (
-				sameColor.test(card, playedCard) || noColor.test(card) ||
-				(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
-				(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard))
-			);
-		}
-		else return (
+		return (
+			sameColor.test(card, playedCard) || noColor.test(card) ||
 			(isActionCard.test(card) && isActionCard.test(playedCard.getCard()) && sameActionCard.test(card, playedCard)) || 
-			(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard)) 
+			(isNormalCard.test(card) && isNormalCard.test(playedCard.getCard()) && sameNumber.test(card, playedCard))
 		);
 	}
 	
